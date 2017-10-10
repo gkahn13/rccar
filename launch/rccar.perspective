@@ -1,0 +1,450 @@
+{
+  "keys": {}, 
+  "groups": {
+    "pluginmanager": {
+      "keys": {
+        "running-plugins": {
+          "type": "repr", 
+          "repr": "{u'rqt_plot/Plot': [5, 4, 3, 2, 1], u'rqt_image_view/ImageView': [3, 2, 1]}"
+        }
+      }, 
+      "groups": {
+        "plugin__rqt_image_view__ImageView__2": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__ImageViewWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }, 
+                "dock_widget_title": {
+                  "type": "repr", 
+                  "repr": "u'right image'"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "dynamic_range": {
+                  "type": "repr", 
+                  "repr": "False"
+                }, 
+                "max_range": {
+                  "type": "repr", 
+                  "repr": "10.0"
+                }, 
+                "topic": {
+                  "type": "repr", 
+                  "repr": "u'/rccar/zed/right/image_rect_color'"
+                }, 
+                "zoom1": {
+                  "type": "repr", 
+                  "repr": "False"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_image_view__ImageView__3": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__ImageViewWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }, 
+                "dock_widget_title": {
+                  "type": "repr", 
+                  "repr": "u'depth'"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "dynamic_range": {
+                  "type": "repr", 
+                  "repr": "False"
+                }, 
+                "max_range": {
+                  "type": "repr", 
+                  "repr": "10.0"
+                }, 
+                "topic": {
+                  "type": "repr", 
+                  "repr": "u'/rccar/zed/depth/image_rect_color'"
+                }, 
+                "zoom1": {
+                  "type": "repr", 
+                  "repr": "False"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_image_view__ImageView__1": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__ImageViewWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }, 
+                "dock_widget_title": {
+                  "type": "repr", 
+                  "repr": "u'left image'"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "dynamic_range": {
+                  "type": "repr", 
+                  "repr": "False"
+                }, 
+                "max_range": {
+                  "type": "repr", 
+                  "repr": "10.0"
+                }, 
+                "topic": {
+                  "type": "repr", 
+                  "repr": "u'/rccar/zed/left/image_rect_color'"
+                }, 
+                "zoom1": {
+                  "type": "repr", 
+                  "repr": "False"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_plot__Plot__1": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__DataPlotWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }, 
+                "dock_widget_title": {
+                  "type": "repr", 
+                  "repr": "u'servos'"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "autoscroll": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "plot_type": {
+                  "type": "repr", 
+                  "repr": "0"
+                }, 
+                "topics": {
+                  "type": "repr", 
+                  "repr": "[u'/rccar/steer/data', u'/rccar/motor/data']"
+                }, 
+                "y_limits": {
+                  "type": "repr", 
+                  "repr": "[-0.7782926500817666, 106.919690495683]"
+                }, 
+                "x_limits": {
+                  "type": "repr", 
+                  "repr": "[321.49869488616093, 327.44182801246643]"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_plot__Plot__2": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__DataPlotWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }, 
+                "dock_widget_title": {
+                  "type": "repr", 
+                  "repr": "u'sonar'"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "autoscroll": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "plot_type": {
+                  "type": "repr", 
+                  "repr": "0"
+                }, 
+                "topics": {
+                  "type": "repr", 
+                  "repr": "u'/rccar/sonar/data'"
+                }, 
+                "y_limits": {
+                  "type": "repr", 
+                  "repr": "[0.0, 624.0]"
+                }, 
+                "x_limits": {
+                  "type": "repr", 
+                  "repr": "[316.73910894989865, 327.50427198410034]"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_plot__Plot__3": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__DataPlotWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }, 
+                "dock_widget_title": {
+                  "type": "repr", 
+                  "repr": "u'gyro'"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "autoscroll": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "plot_type": {
+                  "type": "repr", 
+                  "repr": "0"
+                }, 
+                "topics": {
+                  "type": "repr", 
+                  "repr": "[u'/rccar/gyro/y', u'/rccar/gyro/x', u'/rccar/gyro/z']"
+                }, 
+                "y_limits": {
+                  "type": "repr", 
+                  "repr": "[-97.58, 160.35]"
+                }, 
+                "x_limits": {
+                  "type": "repr", 
+                  "repr": "[321.62962983985057, 327.572762966156]"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_plot__Plot__4": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__DataPlotWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }, 
+                "dock_widget_title": {
+                  "type": "repr", 
+                  "repr": "u'gps'"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "autoscroll": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "plot_type": {
+                  "type": "repr", 
+                  "repr": "0"
+                }, 
+                "topics": {
+                  "type": "repr", 
+                  "repr": "[u'/rccar/gps/latitude', u'/rccar/gps/longitude']"
+                }, 
+                "y_limits": {
+                  "type": "repr", 
+                  "repr": "[-0.1336032388663969, 0.8663967611336031]"
+                }, 
+                "x_limits": {
+                  "type": "repr", 
+                  "repr": "[-113766366.45302723, -113766365.1071589]"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_plot__Plot__5": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__DataPlotWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }, 
+                "dock_widget_title": {
+                  "type": "repr", 
+                  "repr": "u'state'"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "autoscroll": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "plot_type": {
+                  "type": "repr", 
+                  "repr": "0"
+                }, 
+                "topics": {
+                  "type": "repr", 
+                  "repr": "u'/rccar/state/data'"
+                }, 
+                "y_limits": {
+                  "type": "repr", 
+                  "repr": "[-1.4915123456790118, 4.8603395061728385]"
+                }, 
+                "x_limits": {
+                  "type": "repr", 
+                  "repr": "[324.47074018484017, 327.75177097320557]"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_publisher__Publisher__1": {
+          "keys": {}, 
+          "groups": {
+            "plugin": {
+              "keys": {
+                "publishers": {
+                  "type": "repr", 
+                  "repr": "u'[]'"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_topic__TopicPlugin__1": {
+          "keys": {}, 
+          "groups": {
+            "plugin": {
+              "keys": {
+                "tree_widget_header_state": {
+                  "type": "repr(QByteArray.hex)", 
+                  "repr(QByteArray.hex)": "QtCore.QByteArray('000000ff0000000000000001000000000000000001000000000000000000000000000000000000071e000000050101000100000000000000000500000064ffffffff000000810000000300000005000001b50000000100000003000001120000000100000003000000710000000100000003000000390000000100000003000003ad0000000100000003')", 
+                  "pretty-print": "                              d                     q     9          "
+                }
+              }, 
+              "groups": {}
+            }, 
+            "dock_widget__TopicWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "u'true'"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }, 
+                "dock_widget_title": {
+                  "type": "repr", 
+                  "repr": "u'Topic Monitor'"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }
+      }
+    }, 
+    "mainwindow": {
+      "keys": {
+        "geometry": {
+          "type": "repr(QByteArray.hex)", 
+          "repr(QByteArray.hex)": "QtCore.QByteArray('01d9d0cb0001000000000037fffffff200000a09000006490000004100000018000009ff0000063f000000000000')", 
+          "pretty-print": "     7     I A     ?   "
+        }, 
+        "state": {
+          "type": "repr(QByteArray.hex)", 
+          "repr(QByteArray.hex)": "QtCore.QByteArray('000000ff00000000fd0000000200000002000009bf000001e1fc0100000001fc00000000000009bf0000030000fffffffc0200000002fb0000004c007200710074005f0074006f007000690063005f005f0054006f0070006900630050006c007500670069006e005f005f0031005f005f0054006f0070006900630057006900640067006500740100000019000000720000000000000000fc00000019000001e1000000a700fffffffc0100000002fb00000042007200710074005f0070006c006f0074005f005f0050006c006f0074005f005f0031005f005f00440061007400610050006c006f00740057006900640067006500740100000000000007b50000017d00fffffffb00000042007200710074005f0070006c006f0074005f005f0050006c006f0074005f005f0035005f005f00440061007400610050006c006f007400570069006400670065007401000007bb000002040000017d00ffffff00000003000009bf00000412fc0100000005fc00000000000003260000017d00fffffffc0200000002fb00000042007200710074005f0070006c006f0074005f005f0050006c006f0074005f005f0032005f005f00440061007400610050006c006f007400570069006400670065007401000002000000020d000000a700fffffffb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0031005f005f0049006d00610067006500560069006500770057006900640067006500740100000413000001ff0000005100fffffffb00000058007200710074005f007000750062006c00690073006800650072005f005f005000750062006c00690073006800650072005f005f0031005f005f005000750062006c0069007300680065007200570069006400670065007401000000000000073f0000000000000000fb00000042007200710074005f006d00730067005f005f004d0065007300730061006700650073005f005f0031005f005f006d0065007300730061006700650073002e0075006901000000000000073f0000000000000000fc0000032c0000036a0000017d00fffffffc0200000002fb00000042007200710074005f0070006c006f0074005f005f0050006c006f0074005f005f0033005f005f00440061007400610050006c006f007400570069006400670065007401000002000000020e000000a700fffffffb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0032005f005f0049006d00610067006500560069006500770057006900640067006500740100000414000001fe0000005100fffffffc0000069c000003230000017d00fffffffc0200000002fb00000042007200710074005f0070006c006f0074005f005f0050006c006f0074005f005f0034005f005f00440061007400610050006c006f007400570069006400670065007401000002000000020d000000a700fffffffb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0033005f005f0049006d00610067006500560069006500770057006900640067006500740100000413000001ff0000005100ffffff000009bf0000000000000004000000040000000800000008fc00000001000000030000000100000036004d0069006e0069006d0069007a006500640044006f0063006b00570069006400670065007400730054006f006f006c0062006100720000000000ffffffff0000000000000000')", 
+          "pretty-print": "                                                                       r                 Brqt_plot__Plot__1__DataPlotWidget          Brqt_plot__Plot__5__DataPlotWidget                     & }                                                                                                      Q                                                    ?                                           ?                 Brqt_plot__Plot__3__DataPlotWidget          Zrqt_image_view__ImageView__2__ImageViewWidget            # }                                                                                                      Q                                                          "
+        }
+      }, 
+      "groups": {
+        "toolbar_areas": {
+          "keys": {
+            "MinimizedDockWidgetsToolbar": {
+              "type": "repr", 
+              "repr": "8"
+            }
+          }, 
+          "groups": {}
+        }
+      }
+    }
+  }
+}
