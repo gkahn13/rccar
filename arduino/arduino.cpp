@@ -1,16 +1,27 @@
-/* Libraries */
+/*
+ * Libraries
+ */
 #include "PinChangeInterrupt.h"
+#include <Servo.h>
+#include <TimerOne.h>
 
-/* General definitions */
-#define LOOP_DELAY 10
+
+/*
+ * General definitions
+ */
+#define LOOP_DELAY 20
+volatile unsigned long int current_loop_time = 0;
 volatile unsigned long int previous_loop_time = 0;
+volatile unsigned long int delay_time = 0;
 
 
-/* Radio definitions */
+/*
+ * Radio definitions
+ */
 
-#define PIN_RADIO_SERVO 11
+#define PIN_RADIO_SERVO 13
 #define PIN_RADIO_MOTOR 12
-#define PIN_RADIO_BUTTON 13
+#define PIN_RADIO_BUTTON 11
 
 #define RADIO_SERVO_MIN 1000
 #define RADIO_SERVO_NEUTRAL 1500
@@ -20,8 +31,8 @@ volatile unsigned long int previous_loop_time = 0;
 #define RADIO_MOTOR_NEUTRAL 1500
 #define RADIO_MOTOR_MAX 2000
 
-#define RADIO_BUTTON_MIN 800 // up
-#define RADIO_BUTTON_MAX 2100 // down
+#define RADIO_BUTTON_MIN 100 // up
+#define RADIO_BUTTON_MAX 10000 // down
 #define RADIO_BUTTON_LOCK_PWM 2100
 #define RADIO_BUTTON_RADIO_PWM 1500
 #define RADIO_BUTTON_SERIAL_PWM 900
@@ -40,7 +51,9 @@ volatile unsigned short int radio_button_pwm = RADIO_BUTTON_MIN;
 
 
 
-/* Serial definitions */
+/*
+ * Serial definitions
+ */
 
 #define SERIAL_SERVO_MIN 1
 #define SERIAL_SERVO_NEUTRAL 5000
@@ -54,7 +67,9 @@ volatile unsigned short int serial_motor = SERIAL_MOTOR_NEUTRAL;
 
 
 
-/* Control definitions */
+/*
+ * Control definitions
+ */
 
 #define CONTROL_LOCK 0
 #define CONTROL_RADIO 1
@@ -67,12 +82,35 @@ volatile float control_motor_pct = 0.0; // [-1, 1]
 volatile unsigned short int control_servo_pwm = RADIO_SERVO_NEUTRAL;
 volatile unsigned short int control_motor_pwm = RADIO_MOTOR_NEUTRAL;
 
+#define PIN_SERVO 10
+#define PIN_MOTOR 9
+
+Servo servo;
+Servo motor;
+
+/*
+ * Battery definitions
+ */
+
+#define PIN_BATT_A 0
+#define PIN_BATT_B 1
+
+const float BATT_RATIO = 12.6 / 3.94;
+
+volatile float batt_a_voltage = 0.0;
+volatile float batt_b_voltage = 0.0;
 
 
-/* Interrupts */
+
+/*
+ * Interrupts
+ */
 
 void interrupt_radio_servo(void) {
   radio_servo_curr_interrupt_time = micros();
+  if (!(radio_servo_curr_interrupt_time > radio_servo_prev_interrupt_time)) {
+    return;
+  }
   unsigned short int pwm = radio_servo_curr_interrupt_time - radio_servo_prev_interrupt_time;
   radio_servo_prev_interrupt_time = radio_servo_curr_interrupt_time;
 
@@ -83,6 +121,9 @@ void interrupt_radio_servo(void) {
 
 void interrupt_radio_motor(void) {
   radio_motor_curr_interrupt_time = micros();
+  if (!(radio_motor_curr_interrupt_time > radio_motor_prev_interrupt_time)) {
+    return;
+  }
   unsigned short int pwm = radio_motor_curr_interrupt_time - radio_motor_prev_interrupt_time;
   radio_motor_prev_interrupt_time = radio_motor_curr_interrupt_time;
 
@@ -94,7 +135,10 @@ void interrupt_radio_motor(void) {
 void interrupt_radio_button(void) {
   // get radio pwm
   radio_button_curr_interrupt_time = micros();
-  unsigned short int pwm = radio_button_curr_interrupt_time - radio_button_prev_interrupt_time;
+  if (!(radio_button_curr_interrupt_time > radio_button_prev_interrupt_time)) {
+    return;
+  }
+  unsigned long int pwm = radio_button_curr_interrupt_time - radio_button_prev_interrupt_time;
   radio_button_prev_interrupt_time = radio_button_curr_interrupt_time;
 
   if ((pwm >= RADIO_BUTTON_MIN) && (pwm <= RADIO_BUTTON_MAX)) {
@@ -102,9 +146,9 @@ void interrupt_radio_button(void) {
   }
 
   // change control mode
-  unsigned short int lock_pwm_diff = radio_button_pwm > RADIO_BUTTON_LOCK_PWM ? radio_button_pwm - RADIO_BUTTON_LOCK_PWM : RADIO_BUTTON_LOCK_PWM - radio_button_pwm;
-  unsigned short int radio_pwm_diff = radio_button_pwm > RADIO_BUTTON_RADIO_PWM ? radio_button_pwm - RADIO_BUTTON_RADIO_PWM : RADIO_BUTTON_RADIO_PWM - radio_button_pwm;
-  unsigned short int serial_pwm_diff = radio_button_pwm > RADIO_BUTTON_SERIAL_PWM ? radio_button_pwm - RADIO_BUTTON_SERIAL_PWM : RADIO_BUTTON_SERIAL_PWM - radio_button_pwm;
+  unsigned long int lock_pwm_diff = radio_button_pwm > RADIO_BUTTON_LOCK_PWM ? radio_button_pwm - RADIO_BUTTON_LOCK_PWM : RADIO_BUTTON_LOCK_PWM - radio_button_pwm;
+  unsigned long int radio_pwm_diff = radio_button_pwm > RADIO_BUTTON_RADIO_PWM ? radio_button_pwm - RADIO_BUTTON_RADIO_PWM : RADIO_BUTTON_RADIO_PWM - radio_button_pwm;
+  unsigned long int serial_pwm_diff = radio_button_pwm > RADIO_BUTTON_SERIAL_PWM ? radio_button_pwm - RADIO_BUTTON_SERIAL_PWM : RADIO_BUTTON_SERIAL_PWM - radio_button_pwm;
 
   if ((radio_pwm_diff <= lock_pwm_diff) && (radio_pwm_diff <= serial_pwm_diff)) {
     control_mode = CONTROL_RADIO;
@@ -119,22 +163,35 @@ void interrupt_radio_button(void) {
   }
 }
 
+float get_voltage(int adc_pin) {
+  analogRead(adc_pin);
+  int reading = 0;
+  for(int i=0; i < 5; ++i) {
+    reading += analogRead(adc_pin);
+    delay(20);
+  }
+  float voltage = BATT_RATIO * 5.0 * (reading / 1023.0);
+  voltage /= 5; // for averaging
+  return voltage;
+}
+
+void interrupt_battery(void) {
+  batt_a_voltage = get_voltage(PIN_BATT_A);
+  batt_b_voltage = get_voltage(PIN_BATT_B);
+}
 
 
-/* Serial parsing */
+
+/*
+ * Serial parsing
+ */
 
 void serial_parse(void) {
   /*
-   * Assumes long to parse is aaaabbbb, where
+   * Assumes long to parse is (aaaabbbb), where
    * a - servo [0, 9999]
    * b - motor [0, 9999]
    */
-  // long parsed_int = Serial.parseInt();
-  // if (parsed_int > 0) {
-  //   serial_servo = parsed_int / 10000; // 1e4
-  //   parsed_int -= serial_servo * 10000;
-  //   serial_motor = parsed_int;
-  // }
 
   String parsed_str = Serial.readStringUntil('\n');
   parsed_str.trim();
@@ -164,12 +221,16 @@ void serial_write(void) {
   Serial.print(control_servo_pct, 4);
   Serial.print(",");
   Serial.print(control_motor_pct, 4);
+  Serial.print(",");
+  Serial.print(min(batt_a_voltage, batt_b_voltage), 2);
   Serial.println(")");
 }
 
 
 
-/* Control loop */
+/*
+ * Control loop
+ */
 
 void control_loop(void) {
   // convert to pct
@@ -223,11 +284,17 @@ void control_loop(void) {
   } else {
     control_motor_pwm = control_motor_pct * (RADIO_MOTOR_NEUTRAL - RADIO_MOTOR_MIN) + RADIO_MOTOR_NEUTRAL;
   }
+
+  // write pwm
+  servo.writeMicroseconds(control_servo_pwm);
+  motor.writeMicroseconds(control_motor_pwm);
 }
 
 
 
-/* Main */
+/*
+ * Main
+ */
 
 void setup() {
   // Serial
@@ -241,15 +308,31 @@ void setup() {
     interrupt_radio_motor, CHANGE);
   attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(PIN_RADIO_BUTTON),
     interrupt_radio_button, CHANGE);
+
+  // Servo and motor
+  servo.attach(PIN_SERVO);
+  motor.attach(PIN_MOTOR);
+
+  // Battery
+  interrupt_battery();
+  Timer1.initialize(10000000); // 10 second
+  Timer1.attachInterrupt(interrupt_battery, 10000000);
 }
 
 void loop() {
-  unsigned long int current_loop_time = millis();
 
-  if (current_loop_time - previous_loop_time >= LOOP_DELAY) {
-    previous_loop_time = current_loop_time;
+  control_loop();
+  serial_write();
 
-    control_loop();
-    serial_write();
+  previous_loop_time = current_loop_time;
+  current_loop_time = millis();
+  if (current_loop_time > previous_loop_time) {
+    if (current_loop_time - previous_loop_time < LOOP_DELAY) {
+      delay_time = LOOP_DELAY - (current_loop_time - previous_loop_time);
+      delay(delay_time);
+    } else {
+      delay_time = 0;
+    }
   }
+
 }
