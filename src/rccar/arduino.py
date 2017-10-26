@@ -1,4 +1,10 @@
-import os, serial, threading, queue, collections
+import sys
+if sys.version_info[0] == 2:
+    from Queue import Queue
+else:
+    from queue import Queue
+
+import os, serial, threading, collections
 import threading
 import struct
 
@@ -34,8 +40,8 @@ class Arduino:
                                               callback=self._cmd_steer_callback)
         self.cmd_motor_sub = rospy.Subscriber('cmd/motor', std_msgs.msg.Float32,
                                               callback=self._cmd_motor_callback)
-        self.cmd_steer_queue = queue.Queue()
-        self.cmd_motor_queue = queue.Queue()
+        self.cmd_steer_queue = Queue()
+        self.cmd_motor_queue = Queue()
 
         ### start background ros thread
         print('Starting threads')
