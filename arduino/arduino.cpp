@@ -5,11 +5,14 @@
 #include <Servo.h>
 #include <TimerOne.h>
 
+/***************
+ * Definitions *
+ ***************/
 
 /*
  * General definitions
  */
-#define LOOP_DELAY 20
+#define LOOP_DELAY 10
 volatile unsigned long int current_loop_time = 0;
 volatile unsigned long int previous_loop_time = 0;
 volatile unsigned long int delay_time = 0;
@@ -55,6 +58,8 @@ volatile unsigned short int radio_button_pwm = RADIO_BUTTON_MIN;
  * Serial definitions
  */
 
+#define SERIAL_BAUD_RATE 115200
+
 #define SERIAL_SERVO_MIN 1
 #define SERIAL_SERVO_NEUTRAL 5000
 #define SERIAL_SERVO_MAX 9999
@@ -65,6 +70,8 @@ volatile unsigned short int serial_servo = SERIAL_SERVO_NEUTRAL;
 #define SERIAL_MOTOR_MAX 9999
 volatile unsigned short int serial_motor = SERIAL_MOTOR_NEUTRAL;
 
+#define START_BYTE '<'
+#define STOP_BYTE '>'
 
 
 /*
@@ -100,11 +107,110 @@ const float BATT_RATIO = 12.6 / 3.94;
 volatile float batt_a_voltage = 0.0;
 volatile float batt_b_voltage = 0.0;
 
+#define BATT_DELAY 10000 // ms
+volatile unsigned long int current_batt_time = 0;
+volatile unsigned long int previous_batt_time = 0;
+
+/*
+ * Encoder definitions
+ */
+
+#include "RunningAverage.h"
+
+#define PIN_ENCODER_LEFT 3
+#define PIN_ENCODER_RIGHT 2
+#define INTERRUPT_ENCODER_LEFT 1
+#define INTERRUPT_ENCODER_RIGHT 0
+
+#define ENCODER_AVG_LEN 12
+RunningAverage encoder_avg_times_left(ENCODER_AVG_LEN);
+RunningAverage encoder_avg_times_right(ENCODER_AVG_LEN);
+
+volatile unsigned long int encoder_curr_time_left = 0;
+volatile unsigned long int encoder_prev_time_left = 0;
+volatile unsigned long int encoder_curr_time_right = 0;
+volatile unsigned long int encoder_prev_time_right = 0;
+
+volatile float encoder_rate_left = 0.0;
+volatile float encoder_rate_right = 0.0;
 
 
 /*
- * Interrupts
+ * IMU definitions
  */
+
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Mahony.h>
+#include <Madgwick.h>
+
+
+#include <Adafruit_FXAS21002C.h>
+#include <Adafruit_FXOS8700.h>
+
+#define IMU_DELAY 10 // ms
+
+// Create sensor instances.
+Adafruit_FXAS21002C gyro = Adafruit_FXAS21002C(0x0021002C);
+Adafruit_FXOS8700 accelmag = Adafruit_FXOS8700(0x8700A, 0x8700B);
+
+// Mag calibration values are calculated via ahrs_calibration.
+// These values must be determined for each board/environment.
+// See the image in this sketch folder for the values used
+// below.
+
+// Offsets applied to raw x/y/z mag values
+float mag_offsets[3]            = { 0.93F, -7.47F, -35.23F };
+
+// Soft iron error compensation matrix
+float mag_softiron_matrix[3][3] = { {  0.943,  0.011,  0.020 },
+                                    {  0.022,  0.918, -0.008 },
+                                    {  0.020, -0.008,  1.156 } };
+
+float mag_field_strength        = 50.23F;
+
+// Offsets applied to compensate for gyro zero-drift error for x/y/z
+float gyro_zero_offsets[3]      = { 0.0F, 0.0F, 0.0F };
+
+// Mahony is lighter weight as a filter and should be used
+// on slower systems
+Mahony filter;
+//Madgwick filter;
+
+// accel
+volatile float imu_accel_x = 0.0;
+volatile float imu_accel_y = 0.0;
+volatile float imu_accel_z = 0.0;
+
+// gyro
+volatile float imu_gyro_x = 0.0;
+volatile float imu_gyro_y = 0.0;
+volatile float imu_gyro_z = 0.0;
+
+// orientation
+volatile float imu_q0 = 1.0;
+volatile float imu_q1 = 0.0;
+volatile float imu_q2 = 0.0;
+volatile float imu_q3 = 0.0;
+
+
+/*************
+ * Functions *
+ *************/
+
+/*
+ * Radio functions
+ */
+
+void setup_radio(void) {
+  // Radio interrupts
+  attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(PIN_RADIO_SERVO),
+    interrupt_radio_servo, CHANGE);
+  attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(PIN_RADIO_MOTOR),
+    interrupt_radio_motor, CHANGE);
+  attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(PIN_RADIO_BUTTON),
+    interrupt_radio_button, CHANGE);
+}
 
 void interrupt_radio_servo(void) {
   radio_servo_curr_interrupt_time = micros();
@@ -163,28 +269,16 @@ void interrupt_radio_button(void) {
   }
 }
 
-float get_voltage(int adc_pin) {
-  analogRead(adc_pin);
-  int reading = 0;
-  for(int i=0; i < 5; ++i) {
-    reading += analogRead(adc_pin);
-    delay(20);
-  }
-  float voltage = BATT_RATIO * 5.0 * (reading / 1023.0);
-  voltage /= 5; // for averaging
-  return voltage;
-}
-
-void interrupt_battery(void) {
-  batt_a_voltage = get_voltage(PIN_BATT_A);
-  batt_b_voltage = get_voltage(PIN_BATT_B);
-}
-
 
 
 /*
- * Serial parsing
+ * Serial functions
  */
+
+void setup_serial(void){
+  Serial.begin(SERIAL_BAUD_RATE);
+  Serial.setTimeout(5);
+}
 
 void serial_parse(void) {
   /*
@@ -210,27 +304,100 @@ void serial_parse(void) {
   }
 }
 
+serial_write_float(float f) {
+  byte * b = (byte *) &f;
+  Serial.write(b[0]);
+  Serial.write(b[1]);
+  Serial.write(b[2]);
+  Serial.write(b[3]);
+}
+
 void serial_write(void) {
   /*
-   * Writes tuple (control mode, servo, motor)
+   * Writes tuple
    */
 
-  Serial.print("(");
-  Serial.print(control_mode);
-  Serial.print(",");
-  Serial.print(control_servo_pct, 4);
-  Serial.print(",");
-  Serial.print(control_motor_pct, 4);
-  Serial.print(",");
-  Serial.print(min(batt_a_voltage, batt_b_voltage), 2);
-  Serial.println(")");
+  Serial.print(START_BYTE);
+  serial_write_float(((float)control_mode));
+  serial_write_float(control_servo_pct);
+  serial_write_float(control_motor_pct);
+  serial_write_float(batt_a_voltage);
+  serial_write_float(batt_b_voltage);
+  serial_write_float(encoder_rate_left);
+  serial_write_float(encoder_rate_right);
+  serial_write_float(imu_q0);
+  serial_write_float(imu_q1);
+  serial_write_float(imu_q2);
+  serial_write_float(imu_q3);
+  serial_write_float(imu_accel_x);
+  serial_write_float(imu_accel_y);
+  serial_write_float(imu_accel_z);
+  serial_write_float(imu_gyro_x);
+  serial_write_float(imu_gyro_y);
+  serial_write_float(imu_gyro_z);
+  Serial.write(STOP_BYTE);
+
+  // Serial.print("(");
+
+  // Serial.print(control_mode);
+  // Serial.print(",");
+
+  // Serial.print(control_servo_pct, 4);
+  // Serial.print(",");
+  // Serial.print(control_motor_pct, 4);
+  // Serial.print(",");
+
+  // Serial.print(batt_a_voltage, 2);
+  // Serial.print(",");
+  // Serial.print(batt_b_voltage, 2);
+  // Serial.print(",");
+
+  // Serial.print(encoder_rate_left, 5);
+  // Serial.print(",");
+  // Serial.print(encoder_rate_right, 5);
+  // Serial.print(",");
+
+  // Serial.print("(");
+  // Serial.print(imu_q0, 5);
+  // Serial.print(",");
+  // Serial.print(imu_q1, 5);
+  // Serial.print(",");
+  // Serial.print(imu_q2, 5);
+  // Serial.print(",");
+  // Serial.print(imu_q3, 5);
+  // Serial.print(")");
+  // Serial.print(",");
+
+  // Serial.print("(");
+  // Serial.print(imu_accel_x, 5);
+  // Serial.print(",");
+  // Serial.print(imu_accel_y, 5);
+  // Serial.print(",");
+  // Serial.print(imu_accel_z, 5);
+  // Serial.print(")");
+  // Serial.print(",");
+
+  // Serial.print("(");
+  // Serial.print(imu_gyro_x, 5);
+  // Serial.print(",");
+  // Serial.print(imu_gyro_y, 5);
+  // Serial.print(",");
+  // Serial.print(imu_gyro_z, 5);
+  // Serial.print(")");
+
+  // Serial.println(")");
 }
 
 
 
 /*
- * Control loop
+ * Control functions
  */
+
+void setup_control(void) {
+  servo.attach(PIN_SERVO);
+  motor.attach(PIN_MOTOR);
+}
 
 void control_loop(void) {
   // convert to pct
@@ -291,40 +458,189 @@ void control_loop(void) {
 }
 
 
+/*
+ * Battery functions
+ */
+
+void setup_battery(void) {
+}
+
+float get_voltage(int adc_pin) {
+  analogRead(adc_pin);
+  int reading = 0;
+  for(int i=0; i < 5; ++i) {
+    reading += analogRead(adc_pin);
+    delay(20);
+  }
+  float voltage = BATT_RATIO * 5.0 * (reading / 1023.0);
+  voltage /= 5; // for averaging
+  return voltage;
+}
+
+void battery_loop(void) {
+  batt_a_voltage = get_voltage(PIN_BATT_A);
+  batt_b_voltage = get_voltage(PIN_BATT_B);
+}
+
+
+/*
+ * Encoder functions
+ */
+
+void setup_encoder(void) {
+  pinMode(PIN_ENCODER_LEFT, INPUT);
+  pinMode(PIN_ENCODER_RIGHT, INPUT);
+
+  attachInterrupt(INTERRUPT_ENCODER_LEFT, interrupt_encoder_left, CHANGE);
+  attachInterrupt(INTERRUPT_ENCODER_RIGHT, interrupt_encoder_right, CHANGE);
+}
+
+void interrupt_encoder_left(void) {
+  encoder_curr_time_left = micros();
+  if (encoder_prev_time_left > 0) {
+    encoder_avg_times_left.addValue(encoder_curr_time_left - encoder_prev_time_left);
+  }
+  encoder_prev_time_left = encoder_curr_time_left;
+}
+
+void interrupt_encoder_right(void) {
+  encoder_curr_time_right = micros();
+  if (encoder_prev_time_right > 0) {
+    encoder_avg_times_right.addValue(encoder_curr_time_right - encoder_prev_time_right);
+  }
+  encoder_prev_time_right = encoder_curr_time_right;
+}
+
+void encoder_loop(void) {
+  uint8_t count_left = encoder_avg_times_left.getCount();
+  if (count_left > 0) {
+    unsigned long int added_time_left = micros() - encoder_prev_time_left;
+    // TODO: constant in front is incorrect
+    encoder_rate_left = (1000.0 * 1000.0 / 16.0) * (count_left / (count_left * encoder_avg_times_left.getAverage() + added_time_left));
+  } else {
+    encoder_rate_left = 0.0;
+  }
+
+  uint8_t count_right = encoder_avg_times_right.getCount();
+  if (count_right > 0) {
+    unsigned long int added_time_right = micros() - encoder_prev_time_right;
+    // TODO: constant in front is incorrect
+    encoder_rate_right = (1000.0 * 1000.0 / 16.0) * (count_right / (count_right * encoder_avg_times_right.getAverage() + added_time_right));
+  } else {
+    encoder_rate_right = 0.0;
+  }
+
+}
+
+/*
+ * IMU functions
+ */
+
+void setup_imu(void) {
+  if(!gyro.begin()) {
+    Serial.println("Ooops, no gyro detected ... Check your wiring!");
+    while(1);
+  }
+
+  if(!accelmag.begin(ACCEL_RANGE_4G)) {
+    Serial.println("Ooops, no accel detected ... Check your wiring!");
+    while(1);
+  }
+
+  // Filter expects 70 samples per second
+  // Based on a Bluefruit M0 Feather ... rate should be adjuted for other MCUs
+  filter.begin(IMU_DELAY);
+
+  // Timer1.initialize(IMU_DELAY * 1000); // us
+  // Timer1.attachInterrupt(interrupt_imu, IMU_DELAY * 1000); // us
+}
+
+void imu_loop(void)
+{
+  sensors_event_t gyro_event;
+  sensors_event_t accel_event;
+  sensors_event_t mag_event;
+
+  // Get new data samples
+  gyro.getEvent(&gyro_event);
+  accelmag.getEvent(&accel_event, &mag_event);
+
+  // Apply mag offset compensation (base values in uTesla)
+  float x = mag_event.magnetic.x - mag_offsets[0];
+  float y = mag_event.magnetic.y - mag_offsets[1];
+  float z = mag_event.magnetic.z - mag_offsets[2];
+
+  // Apply mag soft iron error compensation
+  float mx = x * mag_softiron_matrix[0][0] + y * mag_softiron_matrix[0][1] + z * mag_softiron_matrix[0][2];
+  float my = x * mag_softiron_matrix[1][0] + y * mag_softiron_matrix[1][1] + z * mag_softiron_matrix[1][2];
+  float mz = x * mag_softiron_matrix[2][0] + y * mag_softiron_matrix[2][1] + z * mag_softiron_matrix[2][2];
+
+  // Apply gyro zero-rate error compensation
+  float gx = gyro_event.gyro.x + gyro_zero_offsets[0];
+  float gy = gyro_event.gyro.y + gyro_zero_offsets[1];
+  float gz = gyro_event.gyro.z + gyro_zero_offsets[2];
+
+  // read gyro now so it's in rad/s
+  imu_gyro_x = gx;
+  imu_gyro_y = gy;
+  imu_gyro_z = gz;
+
+  // The filter library expects gyro data in degrees/s, but adafruit sensor
+  // uses rad/s so we need to convert them first (or adapt the filter lib
+  // where they are being converted)
+  gx *= 57.2958F;
+  gy *= 57.2958F;
+  gz *= 57.2958F;
+
+  // read accelerometer
+  imu_accel_x = accel_event.acceleration.x;
+  imu_accel_y = accel_event.acceleration.y;
+  imu_accel_z = accel_event.acceleration.z;
+
+  // Update the filter
+  filter.update(gx, gy, gz,
+                accel_event.acceleration.x, accel_event.acceleration.y, accel_event.acceleration.z,
+                mx, my, mz);
+
+  // Read the filter
+  float q0, q1, q2, q3;
+  filter.getQuaternion(&q0, &q1, &q2, &q3);
+  imu_q0 = q0;
+  imu_q1 = q1;
+  imu_q2 = q2;
+  imu_q3 = q3;
+}
+
+
+
+
 
 /*
  * Main
  */
 
 void setup() {
-  // Serial
-  Serial.begin(115200);
-  Serial.setTimeout(5);
-
-  // Radio interrupts
-  attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(PIN_RADIO_SERVO),
-    interrupt_radio_servo, CHANGE);
-  attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(PIN_RADIO_MOTOR),
-    interrupt_radio_motor, CHANGE);
-  attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(PIN_RADIO_BUTTON),
-    interrupt_radio_button, CHANGE);
-
-  // Servo and motor
-  servo.attach(PIN_SERVO);
-  motor.attach(PIN_MOTOR);
-
-  // Battery
-  interrupt_battery();
-  Timer1.initialize(10000000); // 10 second
-  Timer1.attachInterrupt(interrupt_battery, 10000000);
+  setup_serial();
+  setup_radio();
+  setup_control();
+  setup_battery();
+  setup_encoder();
+  setup_imu();
 }
 
 void loop() {
+  previous_loop_time = current_loop_time;
 
+  imu_loop();
   control_loop();
   serial_write();
 
-  previous_loop_time = current_loop_time;
+  current_batt_time = millis();
+  if (current_batt_time - previous_batt_time >= BATT_DELAY) {
+    previous_batt_time = current_batt_time;
+    battery_loop();
+  }
+
   current_loop_time = millis();
   if (current_loop_time > previous_loop_time) {
     if (current_loop_time - previous_loop_time < LOOP_DELAY) {

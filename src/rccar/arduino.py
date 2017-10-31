@@ -1,5 +1,6 @@
 import os, serial, threading, queue, collections
 import threading
+import struct
 
 import numpy as np
 
@@ -9,7 +10,9 @@ import geometry_msgs.msg
 import sensor_msgs.msg
 
 class Arduino:
-
+    START_CHAR = b'<'
+    RECV_FLOATS = 17
+    STOP_CHAR = b'>'
 
     def __init__(self, baudrate=115200, timeout=0.25, write_timeout=0):
         ### setup serial ports
@@ -20,6 +23,12 @@ class Arduino:
         self.mode_pub = rospy.Publisher('mode', std_msgs.msg.Int32, queue_size=100)
         self.steer_pub = rospy.Publisher('steer', std_msgs.msg.Float32, queue_size=100)
         self.motor_pub = rospy.Publisher('motor', std_msgs.msg.Float32, queue_size=100)
+        self.battery_a_pub = rospy.Publisher('battery/a', std_msgs.msg.Float32, queue_size=100)
+        self.battery_b_pub = rospy.Publisher('battery/b', std_msgs.msg.Float32, queue_size=100)
+        self.enc_left_pub = rospy.Publisher('encoder/left', std_msgs.msg.Float32, queue_size=100)
+        self.enc_right_pub = rospy.Publisher('encoder/right', std_msgs.msg.Float32, queue_size=100)
+        self.ori_pub = rospy.Publisher('orientation', geometry_msgs.msg.Quaternion, queue_size=100)
+        self.imu_pub = rospy.Publisher('imu', geometry_msgs.msg.Accel, queue_size=100)
         ### subscribers (info sent to Arduino)
         self.cmd_steer_sub = rospy.Subscriber('cmd/steer', std_msgs.msg.Float32,
                                               callback=self._cmd_steer_callback)
@@ -55,6 +64,34 @@ class Arduino:
     ### ROS methods ###
     ###################
 
+    def _read_serial(self, info):
+        if self.ser.read() != Arduino.START_CHAR:
+            return False
+
+        read_bytes = self.ser.read(4 * Arduino.RECV_FLOATS)
+        stop_char = self.ser.read()
+
+        if stop_char != Arduino.STOP_CHAR:
+            return False
+
+        try:
+            unpacked = struct.unpack('<{0:d}f'.format(Arduino.RECV_FLOATS), read_bytes)
+        except:
+            return False
+
+        info['mode'] = int(unpacked[0])
+        info['steer'] = unpacked[1]
+        info['motor'] = unpacked[2]
+        info['batt_a'] = unpacked[3]
+        info['batt_b'] = unpacked[4]
+        info['enc_left'] = unpacked[5]
+        info['enc_right'] = unpacked[6]
+        info['orientation'] = unpacked[7:11]
+        info['acc'] = unpacked[11:14]
+        info['gyro'] = unpacked[14:17]
+
+        return True
+
     def _serial_thread(self):
         """
         Sends/receives message from servos serial and
@@ -63,25 +100,20 @@ class Arduino:
         info = dict()
         
         while not rospy.is_shutdown():
-            # ser_str = self.ser.readline()
-            # if len(ser_str) > 0:
-            #     print(ser_str)
-            # info['steer'] = 0
-            # info['motor'] = 0
-
-            ### read serial
-            try:
-                ser_str = self.ser.readline()
-                ser_tuple = eval(ser_str)
-                assert(len(ser_tuple) == 3)
-            except:
+            if not self._read_serial(info):
                 continue
-            ### parse servos serial
-            info['mode'], info['steer'], info['motor'] = ser_tuple
+
             ### publish ROS
             self.mode_pub.publish(std_msgs.msg.Int32(info['mode']))
             self.steer_pub.publish(std_msgs.msg.Float32(info['steer']))
             self.motor_pub.publish(std_msgs.msg.Float32(info['motor']))
+            self.battery_a_pub.publish(std_msgs.msg.Float32(info['batt_a']))
+            self.battery_b_pub.publish(std_msgs.msg.Float32(info['batt_b']))
+            self.enc_left_pub.publish(std_msgs.msg.Float32(info['enc_left']))
+            self.enc_right_pub.publish(std_msgs.msg.Float32(info['enc_right']))
+            self.ori_pub.publish(geometry_msgs.msg.Quaternion(*info['orientation']))
+            self.imu_pub.publish(geometry_msgs.msg.Accel(linear=geometry_msgs.msg.Vector3(*info['acc']),
+                                                         angular=geometry_msgs.msg.Vector3(*info['gyro'])))
 
             ### write serial
             write_info = collections.defaultdict(int)
@@ -100,16 +132,7 @@ class Arduino:
                 motor_int = int(np.clip(int(1e4 * 0.5 * (write_info['motor'] + 1)), 1, 9999))
 
                 write_str = str.encode('({0:04d}{1:04d})'.format(steer_int, motor_int))
-                # print('write_str: {0}'.format(write_str))
                 self.ser.write(write_str)
-
-                # write_int = int(1e4 * steer_int) + motor_int
-                # write_bytes = write_int.to_bytes(length=4, byteorder='little')
-                # self.ser.reset_output_buffer()
-                # self.ser.write(write_bytes)
-
-            ### print stuff
-            print('({0}, {1:6.2f}, {2:6.2f})'.format(info['mode'], info['steer'], info['motor']))
 
     #################
     ### Callbacks ###
