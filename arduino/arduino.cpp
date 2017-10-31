@@ -629,26 +629,21 @@ void setup() {
 }
 
 void loop() {
-  previous_loop_time = current_loop_time;
-
-  imu_loop();
-  control_loop();
-  serial_write();
-
-  current_batt_time = millis();
-  if (current_batt_time - previous_batt_time >= BATT_DELAY) {
-    previous_batt_time = current_batt_time;
-    battery_loop();
-  }
 
   current_loop_time = millis();
-  if (current_loop_time > previous_loop_time) {
-    if (current_loop_time - previous_loop_time < LOOP_DELAY) {
-      delay_time = LOOP_DELAY - (current_loop_time - previous_loop_time);
-      delay(delay_time);
-    } else {
-      delay_time = 0;
+  if (current_loop_time - previous_loop_time >= LOOP_DELAY) {
+    previous_loop_time = current_loop_time;
+
+    imu_loop();
+    control_loop();
+    serial_write();
+
+    current_batt_time = millis();
+    if (current_batt_time - previous_batt_time >= BATT_DELAY) {
+      previous_batt_time = current_batt_time;
+      battery_loop();
     }
+
   }
 
 }
