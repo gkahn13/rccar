@@ -20,6 +20,8 @@ class Arduino:
     RECV_FLOATS = 17
     STOP_CHAR = b'>'
 
+    MAX_SERIAL_EXCEPTIONS = 20
+
     def __init__(self, baudrate=115200, timeout=0.25, write_timeout=0):
         ### setup serial ports
         self.ser = self._setup_serial(baudrate, timeout, write_timeout)
@@ -43,11 +45,8 @@ class Arduino:
         self.cmd_steer_queue = Queue()
         self.cmd_motor_queue = Queue()
 
-        ### start background ros thread
-        print('Starting threads')
-        #threading.Thread(target=self._serial_thread).start()
-        self._serial_thread()
-
+        self.num_serial_exceptions = 0
+        
     #############
     ### Setup ###
     #############
@@ -71,14 +70,22 @@ class Arduino:
     ###################
 
     def _read_serial(self, info):
-        if self.ser.read() != Arduino.START_CHAR:
-            return False
+        try:
+            if self.ser.read() != Arduino.START_CHAR:
+                return False
 
-        read_bytes = self.ser.read(4 * Arduino.RECV_FLOATS)
-        stop_char = self.ser.read()
+            read_bytes = self.ser.read(4 * Arduino.RECV_FLOATS)
+            stop_char = self.ser.read()
 
-        if stop_char != Arduino.STOP_CHAR:
-            return False
+            if stop_char != Arduino.STOP_CHAR:
+                return False
+        except serial.serialutil.SerialException as e:
+            self.num_serial_exceptions += 1
+            if self.num_serial_exceptions > Arduino.MAX_SERIAL_EXCEPTIONS:
+                raise e
+            return None
+
+        self.num_serial_exceptions = 0
 
         try:
             unpacked = struct.unpack('<{0:d}f'.format(Arduino.RECV_FLOATS), read_bytes)
@@ -98,7 +105,7 @@ class Arduino:
 
         return True
 
-    def _serial_thread(self):
+    def run(self):
         """
         Sends/receives message from servos serial and
         publishes/subscribes to ros
@@ -155,4 +162,5 @@ class Arduino:
 if __name__ == '__main__':
     rospy.init_node('run_arduino', anonymous=True)
     ard = Arduino()
-    rospy.spin()
+    ard.run()
+    

@@ -43,11 +43,5 @@ class Camera:
 
 if __name__ == '__main__':
     rospy.init_node('run_camera', anonymous=True)
-
-    rospy.sleep(1)
-
     cam = Camera()
-
-    rospy.sleep(1)
-
     cam.run()
