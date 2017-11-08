@@ -30,9 +30,9 @@ volatile unsigned long int delay_time = 0;
 #define RADIO_SERVO_NEUTRAL 1500
 #define RADIO_SERVO_MAX 2000
 
-#define RADIO_MOTOR_MIN 1200
+#define RADIO_MOTOR_MIN 1000
 #define RADIO_MOTOR_NEUTRAL 1500
-#define RADIO_MOTOR_MAX 2000
+#define RADIO_MOTOR_MAX 2000 // 2000
 
 #define RADIO_BUTTON_MIN 100 // up
 #define RADIO_BUTTON_MAX 10000 // down
@@ -126,6 +126,9 @@ volatile unsigned long int previous_batt_time = 0;
 RunningAverage encoder_avg_times_left(ENCODER_AVG_LEN);
 RunningAverage encoder_avg_times_right(ENCODER_AVG_LEN);
 
+const float ENCODER_CONST = (1000.0 * 1000.0) * (0.04 * 3.141592654) / (6.0);
+const float ENCODER_MIN_DT = 1000000.0 * 0.14;
+
 volatile unsigned long int encoder_curr_time_left = 0;
 volatile unsigned long int encoder_prev_time_left = 0;
 volatile unsigned long int encoder_curr_time_right = 0;
@@ -160,14 +163,14 @@ Adafruit_FXOS8700 accelmag = Adafruit_FXOS8700(0x8700A, 0x8700B);
 // below.
 
 // Offsets applied to raw x/y/z mag values
-float mag_offsets[3]            = { 0.93F, -7.47F, -35.23F };
+float mag_offsets[3]            = { -272.47F, -124.95F, -100.16F };
 
 // Soft iron error compensation matrix
-float mag_softiron_matrix[3][3] = { {  0.943,  0.011,  0.020 },
-                                    {  0.022,  0.918, -0.008 },
-                                    {  0.020, -0.008,  1.156 } };
+float mag_softiron_matrix[3][3] = { {  0.975,  0.040,  -0.008 },
+                                    {  0.040,  1.032, -0.009 },
+                                    {  -0.008, -0.009,  0.996 } };
 
-float mag_field_strength        = 50.23F;
+float mag_field_strength        = 56.67F;
 
 // Offsets applied to compensate for gyro zero-drift error for x/y/z
 float gyro_zero_offsets[3]      = { 0.0F, 0.0F, 0.0F };
@@ -219,7 +222,7 @@ void interrupt_radio_servo(void) {
   }
   unsigned short int pwm = radio_servo_curr_interrupt_time - radio_servo_prev_interrupt_time;
   radio_servo_prev_interrupt_time = radio_servo_curr_interrupt_time;
-
+  
   if ((pwm >= RADIO_SERVO_MIN) && (pwm <= RADIO_SERVO_MAX)) {
     radio_servo_pwm = pwm;
   }
@@ -232,7 +235,7 @@ void interrupt_radio_motor(void) {
   }
   unsigned short int pwm = radio_motor_curr_interrupt_time - radio_motor_prev_interrupt_time;
   radio_motor_prev_interrupt_time = radio_motor_curr_interrupt_time;
-
+  
   if ((pwm >= RADIO_MOTOR_MIN) && (pwm <= RADIO_MOTOR_MAX)) {
     radio_motor_pwm = pwm;
   }
@@ -246,22 +249,22 @@ void interrupt_radio_button(void) {
   }
   unsigned long int pwm = radio_button_curr_interrupt_time - radio_button_prev_interrupt_time;
   radio_button_prev_interrupt_time = radio_button_curr_interrupt_time;
-
+  
   if ((pwm >= RADIO_BUTTON_MIN) && (pwm <= RADIO_BUTTON_MAX)) {
     radio_button_pwm = pwm;
   }
-
+  
   // change control mode
   unsigned long int lock_pwm_diff = radio_button_pwm > RADIO_BUTTON_LOCK_PWM ? radio_button_pwm - RADIO_BUTTON_LOCK_PWM : RADIO_BUTTON_LOCK_PWM - radio_button_pwm;
-  unsigned long int radio_pwm_diff = radio_button_pwm > RADIO_BUTTON_RADIO_PWM ? radio_button_pwm - RADIO_BUTTON_RADIO_PWM : RADIO_BUTTON_RADIO_PWM - radio_button_pwm;
+  unsigned long int radio_pwm_diff = radio_button_pwm > RADIO_BUTTON_RADIO_PWM ? radio_button_pwm - RADIO_BUTTON_RADIO_PWM : RADIO_BUTTON_RADIO_PWM - radio_button_pwm; 
   unsigned long int serial_pwm_diff = radio_button_pwm > RADIO_BUTTON_SERIAL_PWM ? radio_button_pwm - RADIO_BUTTON_SERIAL_PWM : RADIO_BUTTON_SERIAL_PWM - radio_button_pwm;
-
+  
   if ((radio_pwm_diff <= lock_pwm_diff) && (radio_pwm_diff <= serial_pwm_diff)) {
     control_mode = CONTROL_RADIO;
   } else if ((serial_pwm_diff <= lock_pwm_diff) && (serial_pwm_diff <= radio_pwm_diff)){
     if (control_mode != CONTROL_SERIAL) {
       serial_servo = SERIAL_SERVO_NEUTRAL;
-      serial_motor = SERIAL_MOTOR_NEUTRAL;
+      serial_motor = SERIAL_MOTOR_NEUTRAL; 
     }
     control_mode = CONTROL_SERIAL;
   } else {
@@ -274,10 +277,10 @@ void interrupt_radio_button(void) {
 /*
  * Serial functions
  */
-
-void setup_serial(void){
+ 
+void setup_serial(void){ 
   Serial.begin(SERIAL_BAUD_RATE);
-  Serial.setTimeout(5);
+  Serial.setTimeout(5); 
 }
 
 void serial_parse(void) {
@@ -286,11 +289,11 @@ void serial_parse(void) {
    * a - servo [0, 9999]
    * b - motor [0, 9999]
    */
-
+  
   String parsed_str = Serial.readStringUntil('\n');
   parsed_str.trim();
   unsigned short int length = parsed_str.length();
-
+  
   long parsed_int = 0;
   if (length >= 3) {
     if ((parsed_str.charAt(0) == '(') && (parsed_str.charAt(length - 1) == ')')) {
@@ -313,10 +316,6 @@ serial_write_float(float f) {
 }
 
 void serial_write(void) {
-  /*
-   * Writes tuple
-   */
-
   Serial.print(START_BYTE);
   serial_write_float(((float)control_mode));
   serial_write_float(control_servo_pct);
@@ -336,27 +335,31 @@ void serial_write(void) {
   serial_write_float(imu_gyro_y);
   serial_write_float(imu_gyro_z);
   Serial.write(STOP_BYTE);
-
+   
   // Serial.print("(");
-
+  
   // Serial.print(control_mode);
   // Serial.print(",");
-
+  
   // Serial.print(control_servo_pct, 4);
   // Serial.print(",");
   // Serial.print(control_motor_pct, 4);
   // Serial.print(",");
-
+  
   // Serial.print(batt_a_voltage, 2);
   // Serial.print(",");
   // Serial.print(batt_b_voltage, 2);
   // Serial.print(",");
-
+  
   // Serial.print(encoder_rate_left, 5);
   // Serial.print(",");
   // Serial.print(encoder_rate_right, 5);
   // Serial.print(",");
-
+  
+  // uint8_t count_left = encoder_avg_times_left.getCount();
+  // Serial.print((1000.0 * 1000.0 * count_left) / (16.0 * (count_left * encoder_avg_times_left.getAverage())));
+  // Serial.print(",");
+  
   // Serial.print("(");
   // Serial.print(imu_q0, 5);
   // Serial.print(",");
@@ -367,7 +370,7 @@ void serial_write(void) {
   // Serial.print(imu_q3, 5);
   // Serial.print(")");
   // Serial.print(",");
-
+  
   // Serial.print("(");
   // Serial.print(imu_accel_x, 5);
   // Serial.print(",");
@@ -376,7 +379,7 @@ void serial_write(void) {
   // Serial.print(imu_accel_z, 5);
   // Serial.print(")");
   // Serial.print(",");
-
+  
   // Serial.print("(");
   // Serial.print(imu_gyro_x, 5);
   // Serial.print(",");
@@ -384,7 +387,7 @@ void serial_write(void) {
   // Serial.print(",");
   // Serial.print(imu_gyro_z, 5);
   // Serial.print(")");
-
+  
   // Serial.println(")");
 }
 
@@ -410,7 +413,7 @@ void control_loop(void) {
     } else {
       control_servo_pct = -((float) (RADIO_SERVO_NEUTRAL - pwm)) / (RADIO_SERVO_NEUTRAL - RADIO_SERVO_MIN);
     }
-
+    
     // motor
     pwm = radio_motor_pwm;
     if (pwm >= RADIO_MOTOR_NEUTRAL) {
@@ -421,14 +424,14 @@ void control_loop(void) {
   } else if (control_mode == CONTROL_SERIAL) {
     // parse serial
     serial_parse();
-
+    
     // convert serial
     if (serial_servo >= SERIAL_SERVO_NEUTRAL) {
       control_servo_pct = ((float) (serial_servo - SERIAL_SERVO_NEUTRAL)) / (SERIAL_SERVO_MAX - SERIAL_SERVO_NEUTRAL);
     } else {
       control_servo_pct = -((float) (SERIAL_SERVO_NEUTRAL - serial_servo)) / (SERIAL_SERVO_NEUTRAL - SERIAL_SERVO_MIN);
     }
-
+    
     if (serial_motor >= SERIAL_MOTOR_NEUTRAL) {
       control_motor_pct = ((float) (serial_motor - SERIAL_MOTOR_NEUTRAL)) / (SERIAL_MOTOR_MAX - SERIAL_MOTOR_NEUTRAL);
     } else {
@@ -438,20 +441,20 @@ void control_loop(void) {
     control_servo_pct = 0.0;
     control_motor_pct = 0.0;
   }
-
+  
   // convert to pwm
   if (control_servo_pct >= 0) {
     control_servo_pwm = control_servo_pct * (RADIO_SERVO_MAX - RADIO_SERVO_NEUTRAL) + RADIO_SERVO_NEUTRAL;
   } else {
     control_servo_pwm = control_servo_pct * (RADIO_SERVO_NEUTRAL - RADIO_SERVO_MIN) + RADIO_SERVO_NEUTRAL;
   }
-
-  if (control_motor_pct >= 0) {
-    control_motor_pwm = control_motor_pct * (RADIO_MOTOR_MAX - RADIO_MOTOR_NEUTRAL) + RADIO_MOTOR_NEUTRAL;
+  
+  if (control_motor_pct < 0) {
+    control_motor_pwm = -control_motor_pct * (RADIO_MOTOR_MAX - RADIO_MOTOR_NEUTRAL) + RADIO_MOTOR_NEUTRAL;
   } else {
-    control_motor_pwm = control_motor_pct * (RADIO_MOTOR_NEUTRAL - RADIO_MOTOR_MIN) + RADIO_MOTOR_NEUTRAL;
+    control_motor_pwm = -control_motor_pct * (RADIO_MOTOR_NEUTRAL - RADIO_MOTOR_MIN) + RADIO_MOTOR_NEUTRAL;
   }
-
+  
   // write pwm
   servo.writeMicroseconds(control_servo_pwm);
   motor.writeMicroseconds(control_motor_pwm);
@@ -461,10 +464,10 @@ void control_loop(void) {
 /*
  * Battery functions
  */
-
+ 
 void setup_battery(void) {
 }
-
+ 
 float get_voltage(int adc_pin) {
   analogRead(adc_pin);
   int reading = 0;
@@ -490,9 +493,9 @@ void battery_loop(void) {
 void setup_encoder(void) {
   pinMode(PIN_ENCODER_LEFT, INPUT);
   pinMode(PIN_ENCODER_RIGHT, INPUT);
-
-  attachInterrupt(INTERRUPT_ENCODER_LEFT, interrupt_encoder_left, CHANGE);
-  attachInterrupt(INTERRUPT_ENCODER_RIGHT, interrupt_encoder_right, CHANGE);
+  
+  attachInterrupt(INTERRUPT_ENCODER_LEFT, interrupt_encoder_left, RISING);
+  attachInterrupt(INTERRUPT_ENCODER_RIGHT, interrupt_encoder_right, RISING); 
 }
 
 void interrupt_encoder_left(void) {
@@ -515,17 +518,27 @@ void encoder_loop(void) {
   uint8_t count_left = encoder_avg_times_left.getCount();
   if (count_left > 0) {
     unsigned long int added_time_left = micros() - encoder_prev_time_left;
-    // TODO: constant in front is incorrect
-    encoder_rate_left = (1000.0 * 1000.0 / 16.0) * (count_left / (count_left * encoder_avg_times_left.getAverage() + added_time_left));
+    float encoder_avg_left = encoder_avg_times_left.getAverage();
+    if (added_time_left > ENCODER_MIN_DT) {
+      encoder_rate_left = 0.0;
+      encoder_avg_times_left.clear();
+    } else {
+      encoder_rate_left = (ENCODER_CONST * count_left) / (count_left * encoder_avg_left + added_time_left);
+    }
   } else {
     encoder_rate_left = 0.0;
   }
-
+  
   uint8_t count_right = encoder_avg_times_right.getCount();
   if (count_right > 0) {
     unsigned long int added_time_right = micros() - encoder_prev_time_right;
-    // TODO: constant in front is incorrect
-    encoder_rate_right = (1000.0 * 1000.0 / 16.0) * (count_right / (count_right * encoder_avg_times_right.getAverage() + added_time_right));
+    float encoder_avg_right = encoder_avg_times_right.getAverage();
+    if (added_time_right > ENCODER_MIN_DT) {
+      encoder_rate_right = 0.0;
+      encoder_avg_times_right.clear();
+    } else {
+      encoder_rate_right = (ENCODER_CONST * count_right) / (count_right * encoder_avg_times_right.getAverage() + added_time_right);
+    }
   } else {
     encoder_rate_right = 0.0;
   }
@@ -535,7 +548,7 @@ void encoder_loop(void) {
 /*
  * IMU functions
  */
-
+ 
 void setup_imu(void) {
   if(!gyro.begin()) {
     Serial.println("Ooops, no gyro detected ... Check your wiring!");
@@ -550,7 +563,7 @@ void setup_imu(void) {
   // Filter expects 70 samples per second
   // Based on a Bluefruit M0 Feather ... rate should be adjuted for other MCUs
   filter.begin(IMU_DELAY);
-
+  
   // Timer1.initialize(IMU_DELAY * 1000); // us
   // Timer1.attachInterrupt(interrupt_imu, IMU_DELAY * 1000); // us
 }
@@ -579,7 +592,7 @@ void imu_loop(void)
   float gx = gyro_event.gyro.x + gyro_zero_offsets[0];
   float gy = gyro_event.gyro.y + gyro_zero_offsets[1];
   float gz = gyro_event.gyro.z + gyro_zero_offsets[2];
-
+  
   // read gyro now so it's in rad/s
   imu_gyro_x = gx;
   imu_gyro_y = gy;
@@ -591,7 +604,7 @@ void imu_loop(void)
   gx *= 57.2958F;
   gy *= 57.2958F;
   gz *= 57.2958F;
-
+  
   // read accelerometer
   imu_accel_x = accel_event.acceleration.x;
   imu_accel_y = accel_event.acceleration.y;
@@ -626,24 +639,28 @@ void setup() {
   setup_battery();
   setup_encoder();
   setup_imu();
+  
+  battery_loop();
 }
 
 void loop() {
-
+  
   current_loop_time = millis();
   if (current_loop_time - previous_loop_time >= LOOP_DELAY) {
     previous_loop_time = current_loop_time;
-
+    
     imu_loop();
+    encoder_loop();
     control_loop();
     serial_write();
-
+    
     current_batt_time = millis();
     if (current_batt_time - previous_batt_time >= BATT_DELAY) {
       previous_batt_time = current_batt_time;
       battery_loop();
     }
-
+  
   }
-
+  
 }
+
