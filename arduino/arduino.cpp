@@ -126,6 +126,9 @@ volatile unsigned long int previous_batt_time = 0;
 RunningAverage encoder_avg_times_left(ENCODER_AVG_LEN);
 RunningAverage encoder_avg_times_right(ENCODER_AVG_LEN);
 
+const float ENCODER_CONST = (1000.0 * 1000.0) * (0.04 * 3.141592654) / (6.0);
+const float ENCODER_MIN_DT = 1000000.0 * 0.14;
+
 volatile unsigned long int encoder_curr_time_left = 0;
 volatile unsigned long int encoder_prev_time_left = 0;
 volatile unsigned long int encoder_curr_time_right = 0;
@@ -160,14 +163,14 @@ Adafruit_FXOS8700 accelmag = Adafruit_FXOS8700(0x8700A, 0x8700B);
 // below.
 
 // Offsets applied to raw x/y/z mag values
-float mag_offsets[3]            = { 0.93F, -7.47F, -35.23F };
+float mag_offsets[3]            = { -272.47F, -124.95F, -100.16F };
 
 // Soft iron error compensation matrix
-float mag_softiron_matrix[3][3] = { {  0.943,  0.011,  0.020 },
-                                    {  0.022,  0.918, -0.008 },
-                                    {  0.020, -0.008,  1.156 } };
+float mag_softiron_matrix[3][3] = { {  0.975,  0.040,  -0.008 },
+                                    {  0.040,  1.032, -0.009 },
+                                    {  -0.008, -0.009,  0.996 } };
 
-float mag_field_strength        = 50.23F;
+float mag_field_strength        = 56.67F;
 
 // Offsets applied to compensate for gyro zero-drift error for x/y/z
 float gyro_zero_offsets[3]      = { 0.0F, 0.0F, 0.0F };
@@ -313,10 +316,6 @@ serial_write_float(float f) {
 }
 
 void serial_write(void) {
-  /*
-   * Writes tuple
-   */
-
   Serial.print(START_BYTE);
   serial_write_float(((float)control_mode));
   serial_write_float(control_servo_pct);
@@ -355,6 +354,10 @@ void serial_write(void) {
   // Serial.print(encoder_rate_left, 5);
   // Serial.print(",");
   // Serial.print(encoder_rate_right, 5);
+  // Serial.print(",");
+
+  // uint8_t count_left = encoder_avg_times_left.getCount();
+  // Serial.print((1000.0 * 1000.0 * count_left) / (16.0 * (count_left * encoder_avg_times_left.getAverage())));
   // Serial.print(",");
 
   // Serial.print("(");
@@ -491,8 +494,8 @@ void setup_encoder(void) {
   pinMode(PIN_ENCODER_LEFT, INPUT);
   pinMode(PIN_ENCODER_RIGHT, INPUT);
 
-  attachInterrupt(INTERRUPT_ENCODER_LEFT, interrupt_encoder_left, CHANGE);
-  attachInterrupt(INTERRUPT_ENCODER_RIGHT, interrupt_encoder_right, CHANGE);
+  attachInterrupt(INTERRUPT_ENCODER_LEFT, interrupt_encoder_left, RISING);
+  attachInterrupt(INTERRUPT_ENCODER_RIGHT, interrupt_encoder_right, RISING);
 }
 
 void interrupt_encoder_left(void) {
@@ -515,8 +518,13 @@ void encoder_loop(void) {
   uint8_t count_left = encoder_avg_times_left.getCount();
   if (count_left > 0) {
     unsigned long int added_time_left = micros() - encoder_prev_time_left;
-    // TODO: constant in front is incorrect
-    encoder_rate_left = (1000.0 * 1000.0 / 16.0) * (count_left / (count_left * encoder_avg_times_left.getAverage() + added_time_left));
+    float encoder_avg_left = encoder_avg_times_left.getAverage();
+    if (added_time_left > ENCODER_MIN_DT) {
+      encoder_rate_left = 0.0;
+      encoder_avg_times_left.clear();
+    } else {
+      encoder_rate_left = (ENCODER_CONST * count_left) / (count_left * encoder_avg_left + added_time_left);
+    }
   } else {
     encoder_rate_left = 0.0;
   }
@@ -524,8 +532,13 @@ void encoder_loop(void) {
   uint8_t count_right = encoder_avg_times_right.getCount();
   if (count_right > 0) {
     unsigned long int added_time_right = micros() - encoder_prev_time_right;
-    // TODO: constant in front is incorrect
-    encoder_rate_right = (1000.0 * 1000.0 / 16.0) * (count_right / (count_right * encoder_avg_times_right.getAverage() + added_time_right));
+    float encoder_avg_right = encoder_avg_times_right.getAverage();
+    if (added_time_right > ENCODER_MIN_DT) {
+      encoder_rate_right = 0.0;
+      encoder_avg_times_right.clear();
+    } else {
+      encoder_rate_right = (ENCODER_CONST * count_right) / (count_right * encoder_avg_times_right.getAverage() + added_time_right);
+    }
   } else {
     encoder_rate_right = 0.0;
   }
@@ -626,6 +639,8 @@ void setup() {
   setup_battery();
   setup_encoder();
   setup_imu();
+
+  battery_loop();
 }
 
 void loop() {
@@ -635,6 +650,7 @@ void loop() {
     previous_loop_time = current_loop_time;
 
     imu_loop();
+    encoder_loop();
     control_loop();
     serial_write();
 
