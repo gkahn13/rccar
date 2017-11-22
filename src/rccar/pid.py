@@ -22,7 +22,7 @@ class PID:
         self._encoder_sub = rospy.Subscriber('encoder/both', std_msgs.msg.Float32, callback=self._encoder_callback)
         self._motor_sub = rospy.Subscriber('motor', std_msgs.msg.Float32, callback=self._motor_callback)
         ### publishers
-        self._motor_pub = rospy.publisher('cmd/motor', std_msgs.msg.Float32, queue_size=100)
+        self._motor_pub = rospy.Publisher('cmd/motor', std_msgs.msg.Float32, queue_size=100)
     
     ###########
     ### ROS ###
@@ -41,10 +41,9 @@ class PID:
     ### PID loop ###
     ################
 
-    def _update_rosparams:
-        self._kp = rospy.get_param('kp', 0.03)
-        self._kd = rospy.get_param('kd', 0.0)
-        
+    def _update_rosparams(self):
+        self._kp = rospy.get_param('~kp')
+        self._kd = rospy.get_param('~kd')
 
     def run(self):
         err = 0.

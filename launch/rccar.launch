@@ -10,7 +10,11 @@
         <node name="run_camera" pkg="rccar" type="camera_node.py" output="log" respawn="true" if="$(arg use_camera)">      
         </node>
 
-        <node name="run_pid" pkg="rccar" type="pid_node.py" output="log" respawn="true" if="$(use_pid)">
+        <node name="run_pid" pkg="rccar" type="pid_node.py" output="log" respawn="true" if="$(arg use_pid)">
+              <rosparam>
+                kp: 0.045
+                kd: 0.00
+              </rosparam>
         </node>
     </group>
 

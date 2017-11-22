@@ -123,14 +123,14 @@ class Arduino:
         self.motor_pub.publish(std_msgs.msg.Float32(info['motor']))
         self.battery_a_pub.publish(std_msgs.msg.Float32(info['batt_a']))
         self.battery_b_pub.publish(std_msgs.msg.Float32(info['batt_b']))
-        self.enc_left_pub.publish(std_msgs.msg.Float32(info['enc_left']))
-        self.enc_right_pub.publish(std_msgs.msg.Float32(info['enc_right']))
+        self.enc_left_pub.publish(std_msgs.msg.Float32(np.sign(info['motor']) * info['enc_left']))
+        self.enc_right_pub.publish(std_msgs.msg.Float32(np.sign(info['motor']) * info['enc_right']))
         self.ori_pub.publish(geometry_msgs.msg.Quaternion(*info['orientation']))
         self.imu_pub.publish(geometry_msgs.msg.Accel(linear=geometry_msgs.msg.Vector3(*info['acc']),
                                                      angular=geometry_msgs.msg.Vector3(*info['gyro'])))
 
         ### transformations of raw topics
-        self.enc_pub.publish(std_msgs.msg.Float32(0.5 * (info['enc_left'] + info['enc_right'])))
+        self.enc_pub.publish(std_msgs.msg.Float32(0.5 * np.sign(info['motor']) * (info['enc_left'] + info['enc_right'])))
         self.rpy_pub.publish(geometry_msgs.msg.Vector3(*tft.euler_from_quaternion(list(info['orientation'][1:]) + \
                                                                                     [info['orientation'][0]])))
         self.battery_low_pub.publish(std_msgs.msg.Int32(int((info['batt_a'] < 3.4 * 3) or (info['batt_b'] < 3.4 * 3))))
