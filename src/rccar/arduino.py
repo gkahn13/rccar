@@ -35,16 +35,19 @@ class Arduino:
         self.battery_b_pub = rospy.Publisher('battery/b', std_msgs.msg.Float32, queue_size=100)
         self.enc_left_pub = rospy.Publisher('encoder/left', std_msgs.msg.Float32, queue_size=100)
         self.enc_right_pub = rospy.Publisher('encoder/right', std_msgs.msg.Float32, queue_size=100)
-        self.ori_pub = rospy.Publisher('orientation', geometry_msgs.msg.Quaternion, queue_size=100)
+        self.ori_pub = rospy.Publisher('orientation/quat', geometry_msgs.msg.Quaternion, queue_size=100)
         self.imu_pub = rospy.Publisher('imu', geometry_msgs.msg.Accel, queue_size=100)
         ### secondary publishers
-        self.enc_pub = rospy.Publisher('encoder', std_msgs.msg.Float32, queue_size=100)
+        self.enc_pub = rospy.Publisher('encoder/both', std_msgs.msg.Float32, queue_size=100)
         self.rpy_pub = rospy.Publisher('orientation/rpy', geometry_msgs.msg.Vector3, queue_size=100)
-        self.battery_low_pub = rospy.Publisher('battery/low', std_msgs.msg.Bool, queue_size=100)
-        self.collision_pub = rospy.Publisher('collision', std_msgs.msg.Bool, queue_size=100)
-        self.collision_flip_pub = rospy.Publisher('collision/flip', std_msgs.msg.Bool, queue_size=100)
-        self.collision_jolt_pub = rospy.Publisher('collision/jolt', std_msgs.msg.Bool, queue_size=100)
-        self.collision_stuck_pub = rospy.Publisher('collision/stuck', std_msgs.msg.Bool, queue_size=100)
+        self.battery_low_pub = rospy.Publisher('battery/low', std_msgs.msg.Int32, queue_size=100)
+        self.collision_pub = rospy.Publisher('collision/all', std_msgs.msg.Int32, queue_size=100)
+        self.collision_flip_pub = rospy.Publisher('collision/flip', std_msgs.msg.Int32, queue_size=100)
+        self.collision_jolt_pub = rospy.Publisher('collision/jolt', std_msgs.msg.Int32, queue_size=100)
+        self.collision_stuck_pub = rospy.Publisher('collision/stuck', std_msgs.msg.Int32, queue_size=100)
+        self.collision_stuck_encoder_deque = collections.deque([], 30)
+        self.collision_stuck_motor_deque = collections.deque([], 30)
+        self.collision_stuck_end_idx = 15
         ### subscribers (info sent to Arduino)
         self.cmd_steer_sub = rospy.Subscriber('cmd/steer', std_msgs.msg.Float32,
                                               callback=self._cmd_steer_callback)
@@ -130,15 +133,22 @@ class Arduino:
         self.enc_pub.publish(std_msgs.msg.Float32(0.5 * (info['enc_left'] + info['enc_right'])))
         self.rpy_pub.publish(geometry_msgs.msg.Vector3(*tft.euler_from_quaternion(list(info['orientation'][1:]) + \
                                                                                     [info['orientation'][0]])))
-        self.battery_low_pub.publish(std_msgs.msg.Bool((info['batt_a'] < 3.4 * 3) or (info['batt_b'] < 3.4 * 3)))
+        self.battery_low_pub.publish(std_msgs.msg.Int32(int((info['batt_a'] < 3.4 * 3) or (info['batt_b'] < 3.4 * 3))))
 
         coll_flip = (info['acc'][2] < 5.0)
-        coll_jolt = (abs(info['acc'][0]) > 10.0)
+        coll_jolt = (info['acc'][0] < -10.0)
         coll_stuck = (info['motor'] > 0.2 and (abs(0.5 * (info['enc_left'] + info['enc_right'])) < 0.2))
-        self.collision_pub.publish(std_msgs.msg.Bool(coll_flip or coll_jolt or coll_stuck))
-        self.collision_flip_pub.publish(std_msgs.msg.Bool(coll_flip))
-        self.collision_jolt_pub.publish(std_msgs.msg.Bool(coll_jolt))
-        self.collision_stuck_pub.publish(std_msgs.msg.Bool(coll_stuck))
+        self.collision_stuck_encoder_deque.append(abs(0.5 * (info['enc_left'] + info['enc_right'])))
+        self.collision_stuck_motor_deque.append(info['motor'])
+        if len(self.collision_stuck_encoder_deque) == self.collision_stuck_encoder_deque.maxlen:
+            # if encoder is 0 for a long time and trying to motor
+            coll_stuck = (max(list(self.collision_stuck_motor_deque)[:-self.collision_stuck_end_idx]) > 0.15) and (max(self.collision_stuck_encoder_deque) < 1e-3)
+        else:
+            coll_stuck = False
+        self.collision_pub.publish(std_msgs.msg.Int32(int(coll_flip or coll_jolt or coll_stuck)))
+        self.collision_flip_pub.publish(std_msgs.msg.Int32(int(coll_flip)))
+        self.collision_jolt_pub.publish(std_msgs.msg.Int32(int(coll_jolt)))
+        self.collision_stuck_pub.publish(std_msgs.msg.Int32(int(coll_stuck)))
 
     def run(self):
         """

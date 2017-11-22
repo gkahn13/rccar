@@ -1,12 +1,13 @@
 <launch>
     <arg name="car_name" default="rccar" />
+    <arg name="use_camera" default="true" />
     <arg name="use_pid" default="false" />
     
     <group ns="$(arg car_name)">
         <node name="run_arduino" pkg="rccar" type="arduino_node.py" output="log" respawn="true">
         </node>
-        
-        <node name="run_camera" pkg="rccar" type="camera_node.py" output="log" respawn="true">
+
+        <node name="run_camera" pkg="rccar" type="camera_node.py" output="log" respawn="true" if="$(arg use_camera)">      
         </node>
     </group>
 
