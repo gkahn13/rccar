@@ -17,7 +17,7 @@ import sensor_msgs.msg
 
 class Arduino:
     START_CHAR = b'<'
-    RECV_FLOATS = 17
+    RECV_FLOATS = 18
     STOP_CHAR = b'>'
 
     MAX_SERIAL_EXCEPTIONS = 20
@@ -28,27 +28,30 @@ class Arduino:
         assert(self.ser is not None)
         
         ### control publishers (from Arduino)
-        self.mode_pub = rospy.Publisher('mode', std_msgs.msg.Int32, queue_size=100)
-        self.steer_pub = rospy.Publisher('steer', std_msgs.msg.Float32, queue_size=100)
-        self.motor_pub = rospy.Publisher('motor', std_msgs.msg.Float32, queue_size=100)
-        self.battery_a_pub = rospy.Publisher('battery/a', std_msgs.msg.Float32, queue_size=100)
-        self.battery_b_pub = rospy.Publisher('battery/b', std_msgs.msg.Float32, queue_size=100)
-        self.enc_left_pub = rospy.Publisher('encoder/left', std_msgs.msg.Float32, queue_size=100)
-        self.enc_right_pub = rospy.Publisher('encoder/right', std_msgs.msg.Float32, queue_size=100)
-        self.ori_pub = rospy.Publisher('orientation/quat', geometry_msgs.msg.Quaternion, queue_size=100)
-        self.imu_pub = rospy.Publisher('imu', geometry_msgs.msg.Accel, queue_size=100)
+        self.mode_pub = rospy.Publisher('mode', std_msgs.msg.Int32, queue_size=10)
+        self.steer_pub = rospy.Publisher('steer', std_msgs.msg.Float32, queue_size=10)
+        self.motor_pub = rospy.Publisher('motor', std_msgs.msg.Float32, queue_size=10)
+        self.battery_a_pub = rospy.Publisher('battery/a', std_msgs.msg.Float32, queue_size=10)
+        self.battery_b_pub = rospy.Publisher('battery/b', std_msgs.msg.Float32, queue_size=10)
+        self.enc_left_pub = rospy.Publisher('encoder/left', std_msgs.msg.Float32, queue_size=10)
+        self.enc_right_pub = rospy.Publisher('encoder/right', std_msgs.msg.Float32, queue_size=10)
+        self.ori_pub = rospy.Publisher('orientation/quat', geometry_msgs.msg.Quaternion, queue_size=10)
+        self.imu_pub = rospy.Publisher('imu', geometry_msgs.msg.Accel, queue_size=10)
+        self.bumper_pub = rospy.Publisher('bumper', std_msgs.msg.Int32, queue_size=10)
         ### secondary publishers
-        self.enc_pub = rospy.Publisher('encoder/both', std_msgs.msg.Float32, queue_size=100)
-        self.rpy_pub = rospy.Publisher('orientation/rpy', geometry_msgs.msg.Vector3, queue_size=100)
-        self.battery_low_pub = rospy.Publisher('battery/low', std_msgs.msg.Int32, queue_size=100)
-        self.collision_pub = rospy.Publisher('collision/all', std_msgs.msg.Int32, queue_size=100)
-        self.collision_flip_pub = rospy.Publisher('collision/flip', std_msgs.msg.Int32, queue_size=100)
-        self.collision_jolt_pub = rospy.Publisher('collision/jolt', std_msgs.msg.Int32, queue_size=100)
-        self.collision_stuck_pub = rospy.Publisher('collision/stuck', std_msgs.msg.Int32, queue_size=100)
+        self.enc_pub = rospy.Publisher('encoder/both', std_msgs.msg.Float32, queue_size=10)
+        self.rpy_pub = rospy.Publisher('orientation/rpy', geometry_msgs.msg.Vector3, queue_size=10)
+        self.battery_low_pub = rospy.Publisher('battery/low', std_msgs.msg.Int32, queue_size=10)
+        self.collision_pub = rospy.Publisher('collision/all', std_msgs.msg.Int32, queue_size=10)
+        self.collision_flip_pub = rospy.Publisher('collision/flip', std_msgs.msg.Int32, queue_size=10)
+        self.collision_jolt_pub = rospy.Publisher('collision/jolt', std_msgs.msg.Int32, queue_size=10)
+        self.collision_stuck_pub = rospy.Publisher('collision/stuck', std_msgs.msg.Int32, queue_size=10)
         self.collision_stuck_encoder_deque = collections.deque([], 30)
         self.collision_stuck_motor_deque = collections.deque([], 30)
         self.collision_stuck_end_idx = 20
         self.collision_stuck_start_idx = 20
+        self.collision_bumper_zero = 1024
+        self.collision_bumper_pub = rospy.Publisher('collision/bumper', std_msgs.msg.Int32, queue_size=10)
         ### subscribers (info sent to Arduino)
         self.cmd_steer_sub = rospy.Subscriber('cmd/steer', std_msgs.msg.Float32,
                                               callback=self._cmd_steer_callback)
@@ -117,6 +120,7 @@ class Arduino:
         info['orientation'] = unpacked[7:11]
         info['acc'] = unpacked[11:14]
         info['gyro'] = unpacked[14:17]
+        info['bumper'] = int(unpacked[17])
 
         return True
 
@@ -132,7 +136,8 @@ class Arduino:
         self.ori_pub.publish(geometry_msgs.msg.Quaternion(*info['orientation']))
         self.imu_pub.publish(geometry_msgs.msg.Accel(linear=geometry_msgs.msg.Vector3(*info['acc']),
                                                      angular=geometry_msgs.msg.Vector3(*info['gyro'])))
-
+        self.bumper_pub.publish(std_msgs.msg.Int32(info['bumper']))
+        
         ### transformations of raw topics
         self.enc_pub.publish(std_msgs.msg.Float32(0.5 * np.sign(info['motor']) * (info['enc_left'] + info['enc_right'])))
         self.rpy_pub.publish(geometry_msgs.msg.Vector3(*tft.euler_from_quaternion(list(info['orientation'][1:]) + \
@@ -148,11 +153,15 @@ class Arduino:
             coll_stuck = (np.median(list(self.collision_stuck_motor_deque)[:-self.collision_stuck_end_idx]) > 0.15) and (max(list(self.collision_stuck_encoder_deque)[self.collision_stuck_start_idx:]) < 1e-3)
         else:
             coll_stuck = False
-        self.collision_pub.publish(std_msgs.msg.Int32(int(coll_flip or coll_jolt or coll_stuck)))
+        if (abs(info['motor']) < 0.05) and (0.5 * (info['enc_left'] + info['enc_right']) < 1e-4):
+            self.collision_bumper_zero = info['bumper']
+        coll_bumper = (info['bumper'] >= self.collision_bumper_zero + 30)
+        self.collision_pub.publish(std_msgs.msg.Int32(int(coll_flip or coll_jolt or coll_stuck or coll_bumper)))
         self.collision_flip_pub.publish(std_msgs.msg.Int32(int(coll_flip)))
         self.collision_jolt_pub.publish(std_msgs.msg.Int32(int(coll_jolt)))
         self.collision_stuck_pub.publish(std_msgs.msg.Int32(int(coll_stuck)))
-
+        self.collision_bumper_pub.publish(std_msgs.msg.Int32(int(coll_bumper)))
+        
     def run(self):
         """
         Sends/receives message from servos serial and
