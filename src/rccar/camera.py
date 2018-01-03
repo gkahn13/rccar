@@ -9,8 +9,8 @@ class Camera:
     def __init__(self, rate=30.):
         self._rate = rate
 
-        self._pub = rospy.Publisher('camera/image_raw/compressed', sensor_msgs.msg.CompressedImage, queue_size=100)
-
+        self._cam_pub = rospy.Publisher('camera/image_raw/compressed', sensor_msgs.msg.CompressedImage, queue_size=100)
+        
         self._cam = None
         for cam_num in [0, 1]:
             cam = cv2.VideoCapture(cam_num)
@@ -37,7 +37,7 @@ class Camera:
             msg.header.stamp = rospy.Time.now()
             msg.format = "jpeg"
             msg.data = np.array(cv2.imencode('.jpg', img_np)[1]).tostring()
-            self._pub.publish(msg)
+            self._cam_pub.publish(msg)
 
             rate.sleep()
 

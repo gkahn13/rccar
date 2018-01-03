@@ -47,7 +47,8 @@ class Arduino:
         self.collision_stuck_pub = rospy.Publisher('collision/stuck', std_msgs.msg.Int32, queue_size=100)
         self.collision_stuck_encoder_deque = collections.deque([], 30)
         self.collision_stuck_motor_deque = collections.deque([], 30)
-        self.collision_stuck_end_idx = 15
+        self.collision_stuck_end_idx = 20
+        self.collision_stuck_start_idx = 20
         ### subscribers (info sent to Arduino)
         self.cmd_steer_sub = rospy.Subscriber('cmd/steer', std_msgs.msg.Float32,
                                               callback=self._cmd_steer_callback)
@@ -55,7 +56,10 @@ class Arduino:
                                               callback=self._cmd_motor_callback)
         self.cmd_steer_queue = Queue()
         self.cmd_motor_queue = Queue()
-
+        self.collision_lock = threading.RLock()
+        self.collision_occurred = False
+        self.collision_sub = rospy.Subscriber('collision/all', std_msgs.msg.Int32, callback=self._collision_callback)
+        
         self.num_serial_exceptions = 0
         
     #############
@@ -136,13 +140,12 @@ class Arduino:
         self.battery_low_pub.publish(std_msgs.msg.Int32(int((info['batt_a'] < 3.4 * 3) or (info['batt_b'] < 3.4 * 3))))
 
         coll_flip = (info['acc'][2] < 5.0)
-        coll_jolt = (info['acc'][0] < -10.0)
-        coll_stuck = (info['motor'] > 0.2 and (abs(0.5 * (info['enc_left'] + info['enc_right'])) < 0.2))
+        coll_jolt = (info['acc'][0] < -10.0) or (info['acc'][0] > 10.0)
         self.collision_stuck_encoder_deque.append(abs(0.5 * (info['enc_left'] + info['enc_right'])))
-        self.collision_stuck_motor_deque.append(info['motor'])
+        self.collision_stuck_motor_deque.append(abs(info['motor']))
         if len(self.collision_stuck_encoder_deque) == self.collision_stuck_encoder_deque.maxlen:
             # if encoder is 0 for a long time and trying to motor
-            coll_stuck = (max(list(self.collision_stuck_motor_deque)[:-self.collision_stuck_end_idx]) > 0.15) and (max(self.collision_stuck_encoder_deque) < 1e-3)
+            coll_stuck = (np.median(list(self.collision_stuck_motor_deque)[:-self.collision_stuck_end_idx]) > 0.15) and (max(list(self.collision_stuck_encoder_deque)[self.collision_stuck_start_idx:]) < 1e-3)
         else:
             coll_stuck = False
         self.collision_pub.publish(std_msgs.msg.Int32(int(coll_flip or coll_jolt or coll_stuck)))
@@ -176,6 +179,12 @@ class Arduino:
                 else:
                     write_info[var] = info[var]
 
+            with self.collision_lock:
+                if self.collision_occurred:
+                    write_info['steer'] = 0.
+                    write_info['motor'] = 0.
+                self.collision_occurred = False
+                    
             if write_to_ser:
                 steer_int = int(np.clip(int(1e4 * 0.5 * (write_info['steer'] + 1)), 1, 9999))
                 motor_int = int(np.clip(int(1e4 * 0.5 * (write_info['motor'] + 1)), 1, 9999))
@@ -195,6 +204,11 @@ class Arduino:
         if msg.data >= -1. and msg.data <= 1.:
             self.cmd_motor_queue.put(msg.data)
 
+    def _collision_callback(self, msg):
+        if msg.data == 1:
+            with self.collision_lock:
+                self.collision_occurred = True
+            
 if __name__ == '__main__':
     rospy.init_node('run_arduino', anonymous=True)
     ard = Arduino()
