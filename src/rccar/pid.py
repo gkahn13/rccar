@@ -25,6 +25,9 @@ class PID:
         self._encoder_sub = rospy.Subscriber('encoder/both', std_msgs.msg.Float32, callback=self._encoder_callback)
         self._motor_sub = rospy.Subscriber('motor', std_msgs.msg.Float32, callback=self._motor_callback)
         self._mode_sub = rospy.Subscriber('mode', std_msgs.msg.Int32, callback=self._mode_callback)
+        self._is_enabled = True
+        self._enable_sub = rospy.Subscriber('pid/enable', std_msgs.msg.Empty, callback=self._enable_callback)
+        self._disable_sub = rospy.Subscriber('pid/disable', std_msgs.msg.Empty, callback=self._disable_callback)
         ### publishers
         self._motor_pub = rospy.Publisher('cmd/motor', std_msgs.msg.Float32, queue_size=100)
     
@@ -49,7 +52,13 @@ class PID:
     def _mode_callback(self, msg):
         if msg.data != 2:
             self._cmd_vel = 0.
-        
+
+    def _enable_callback(self, msg):
+        self._is_enabled = True
+
+    def _disable_callback(self, msg):
+        self._is_enabled = False
+            
     ################
     ### PID loop ###
     ################
@@ -75,7 +84,8 @@ class PID:
             if self._collision_stamp is not None and  self._collision_stamp >= self._cmd_vel_stamp:
                 new_motor = 0.
 
-            self._motor_pub.publish(std_msgs.msg.Float32(new_motor))
+            if self._is_enabled:
+                self._motor_pub.publish(std_msgs.msg.Float32(new_motor))
     
             err_last = err
 
