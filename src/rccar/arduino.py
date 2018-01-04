@@ -49,7 +49,7 @@ class Arduino:
         self.collision_stuck_encoder_deque = collections.deque([], 30)
         self.collision_stuck_motor_deque = collections.deque([], 30)
         self.collision_stuck_end_idx = 20
-        self.collision_stuck_start_idx = 20
+        self.collision_stuck_start_idx = 0
         self.collision_bumper_zero = 1024
         self.collision_bumper_pub = rospy.Publisher('collision/bumper', std_msgs.msg.Int32, queue_size=10)
         ### subscribers (info sent to Arduino)

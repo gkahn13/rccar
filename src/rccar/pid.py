@@ -24,6 +24,7 @@ class PID:
         self._cmd_vel_sub = rospy.Subscriber('cmd/vel', std_msgs.msg.Float32, callback=self._cmd_vel_callback)
         self._encoder_sub = rospy.Subscriber('encoder/both', std_msgs.msg.Float32, callback=self._encoder_callback)
         self._motor_sub = rospy.Subscriber('motor', std_msgs.msg.Float32, callback=self._motor_callback)
+        self._mode_sub = rospy.Subscriber('mode', std_msgs.msg.Int32, callback=self._mode_callback)
         ### publishers
         self._motor_pub = rospy.Publisher('cmd/motor', std_msgs.msg.Float32, queue_size=100)
     
@@ -45,6 +46,10 @@ class PID:
     def _motor_callback(self, msg):
         self._motor = msg.data
 
+    def _mode_callback(self, msg):
+        if msg.data != 2:
+            self._cmd_vel = 0.
+        
     ################
     ### PID loop ###
     ################
