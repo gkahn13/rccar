@@ -144,7 +144,7 @@ class Arduino:
                                                                                     [info['orientation'][0]])))
         self.battery_low_pub.publish(std_msgs.msg.Int32(int((info['batt_a'] < 3.4 * 3) or (info['batt_b'] < 3.4 * 3))))
 
-        coll_flip = (info['acc'][2] < 5.0)
+        coll_flip = (info['acc'][2] > 5.0)
         coll_jolt = (info['acc'][0] < -10.0) or (info['acc'][0] > 10.0)
         self.collision_stuck_encoder_deque.append(abs(0.5 * (info['enc_left'] + info['enc_right'])))
         self.collision_stuck_motor_deque.append(abs(info['motor']))
