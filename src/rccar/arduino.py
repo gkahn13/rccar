@@ -46,8 +46,8 @@ class Arduino:
         self.collision_flip_pub = rospy.Publisher('collision/flip', std_msgs.msg.Int32, queue_size=10)
         self.collision_jolt_pub = rospy.Publisher('collision/jolt', std_msgs.msg.Int32, queue_size=10)
         self.collision_stuck_pub = rospy.Publisher('collision/stuck', std_msgs.msg.Int32, queue_size=10)
-        self.collision_stuck_encoder_deque = collections.deque([], 30)
-        self.collision_stuck_motor_deque = collections.deque([], 30)
+        self.collision_stuck_encoder_deque = collections.deque([], 40) # TODO: make larger to be more conservative
+        self.collision_stuck_motor_deque = collections.deque([], 40)
         self.collision_stuck_end_idx = 20
         self.collision_stuck_start_idx = 0
         self.collision_bumper_zero = 1024
@@ -121,7 +121,6 @@ class Arduino:
         info['acc'] = unpacked[11:14]
         info['gyro'] = unpacked[14:17]
         info['bumper'] = int(unpacked[17])
-
         return True
 
     def _publish_serial(self, info):
@@ -153,9 +152,9 @@ class Arduino:
             coll_stuck = (np.median(list(self.collision_stuck_motor_deque)[:-self.collision_stuck_end_idx]) > 0.15) and (max(list(self.collision_stuck_encoder_deque)[self.collision_stuck_start_idx:]) < 1e-3)
         else:
             coll_stuck = False
+        coll_bumper = (info['bumper'] >= self.collision_bumper_zero + 30)
         if (abs(info['motor']) < 0.05) and (0.5 * (info['enc_left'] + info['enc_right']) < 1e-4):
             self.collision_bumper_zero = info['bumper']
-        coll_bumper = (info['bumper'] >= self.collision_bumper_zero + 30)
         self.collision_pub.publish(std_msgs.msg.Int32(int(coll_flip or coll_jolt or coll_stuck or coll_bumper)))
         self.collision_flip_pub.publish(std_msgs.msg.Int32(int(coll_flip)))
         self.collision_jolt_pub.publish(std_msgs.msg.Int32(int(coll_jolt)))
