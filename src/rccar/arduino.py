@@ -48,7 +48,9 @@ class Arduino:
         self.collision_stuck_pub = rospy.Publisher('collision/stuck', std_msgs.msg.Int32, queue_size=10)
         self.collision_stuck_encoder_deque = collections.deque([], 40) # TODO: make larger to be more conservative
         self.collision_stuck_motor_deque = collections.deque([], 40)
-        self.collision_stuck_end_idx = 20
+        self.collision_stuck_deque = collections.deque([], 50)
+        self.collision_stuck_pct = 0.9
+        self.collision_stuck_end_idx = 5
         self.collision_stuck_start_idx = 0
         self.collision_bumper_zero = 1024
         self.collision_bumper_pub = rospy.Publisher('collision/bumper', std_msgs.msg.Int32, queue_size=10)
@@ -138,20 +140,25 @@ class Arduino:
         self.bumper_pub.publish(std_msgs.msg.Int32(info['bumper']))
         
         ### transformations of raw topics
-        self.enc_pub.publish(std_msgs.msg.Float32(0.5 * np.sign(info['motor']) * (info['enc_left'] + info['enc_right'])))
+        enc = 0.5 * np.sign(info['motor']) * (info['enc_left'] + info['enc_rig\
+ht'])
+        self.enc_pub.publish(std_msgs.msg.Float32(enc))
         self.rpy_pub.publish(geometry_msgs.msg.Vector3(*tft.euler_from_quaternion(list(info['orientation'][1:]) + \
                                                                                     [info['orientation'][0]])))
         self.battery_low_pub.publish(std_msgs.msg.Int32(int((info['batt_a'] < 3.4 * 3) or (info['batt_b'] < 3.4 * 3))))
 
         coll_flip = (info['acc'][2] > 5.0)
         coll_jolt = (info['acc'][0] < -10.0) or (info['acc'][0] > 10.0)
-        self.collision_stuck_encoder_deque.append(abs(0.5 * (info['enc_left'] + info['enc_right'])))
-        self.collision_stuck_motor_deque.append(abs(info['motor']))
-        if len(self.collision_stuck_encoder_deque) == self.collision_stuck_encoder_deque.maxlen:
-            # if encoder is 0 for a long time and trying to motor
-            coll_stuck = (np.median(list(self.collision_stuck_motor_deque)[:-self.collision_stuck_end_idx]) > 0.15) and (max(list(self.collision_stuck_encoder_deque)[self.collision_stuck_start_idx:]) < 1e-3)
-        else:
-            coll_stuck = False
+        curr_coll_stuck = ((enc == 0) and abs(info['motor']) > 0.15)
+        self.collision_stuck_deque.append(curr_coll_stuck)
+        coll_stuck = (sum(self.collision_stuck_deque) / float(self.collision_stuck_deque.maxlen)) > self.collision_stuck_pct
+        #self.collision_stuck_encoder_deque.append(abs(0.5 * (info['enc_left'] + info['enc_right'])))
+        #self.collision_stuck_motor_deque.append(abs(info['motor']))
+        #if len(self.collision_stuck_encoder_deque) == self.collision_stuck_encoder_deque.maxlen:
+        #    # if encoder is 0 for a long time and trying to motor
+        #    coll_stuck = (np.median(list(self.collision_stuck_motor_deque)[:-self.collision_stuck_end_idx]) > 0.15) and (max(list(self.collision_stuck_encoder_deque)[self.collision_stuck_start_idx:]) < 1e-3)
+        #else:
+        #    coll_stuck = False
         coll_bumper = (info['bumper'] >= self.collision_bumper_zero + 30)
         if (abs(info['motor']) < 0.05) and (0.5 * (info['enc_left'] + info['enc_right']) < 1e-4):
             self.collision_bumper_zero = info['bumper']
