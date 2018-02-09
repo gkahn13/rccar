@@ -31,8 +31,6 @@ class Arduino:
         self.mode_pub = rospy.Publisher('mode', std_msgs.msg.Int32, queue_size=10)
         self.steer_pub = rospy.Publisher('steer', std_msgs.msg.Float32, queue_size=10)
         self.motor_pub = rospy.Publisher('motor', std_msgs.msg.Float32, queue_size=10)
-        self.battery_a_pub = rospy.Publisher('battery/a', std_msgs.msg.Float32, queue_size=10)
-        self.battery_b_pub = rospy.Publisher('battery/b', std_msgs.msg.Float32, queue_size=10)
         self.enc_left_pub = rospy.Publisher('encoder/left', std_msgs.msg.Float32, queue_size=10)
         self.enc_right_pub = rospy.Publisher('encoder/right', std_msgs.msg.Float32, queue_size=10)
         self.ori_pub = rospy.Publisher('orientation/quat', geometry_msgs.msg.Quaternion, queue_size=10)
@@ -41,14 +39,13 @@ class Arduino:
         ### secondary publishers
         self.enc_pub = rospy.Publisher('encoder/both', std_msgs.msg.Float32, queue_size=10)
         self.rpy_pub = rospy.Publisher('orientation/rpy', geometry_msgs.msg.Vector3, queue_size=10)
-        self.battery_low_pub = rospy.Publisher('battery/low', std_msgs.msg.Int32, queue_size=10)
         self.collision_pub = rospy.Publisher('collision/all', std_msgs.msg.Int32, queue_size=10)
         self.collision_flip_pub = rospy.Publisher('collision/flip', std_msgs.msg.Int32, queue_size=10)
         self.collision_jolt_pub = rospy.Publisher('collision/jolt', std_msgs.msg.Int32, queue_size=10)
         self.collision_stuck_pub = rospy.Publisher('collision/stuck', std_msgs.msg.Int32, queue_size=10)
         self.collision_stuck_encoder_deque = collections.deque([], 40) # TODO: make larger to be more conservative
         self.collision_stuck_motor_deque = collections.deque([], 40)
-        self.collision_stuck_deque = collections.deque([], 50)
+        self.collision_stuck_deque = collections.deque([], 80)
         self.collision_stuck_pct = 0.9
         self.collision_stuck_end_idx = 5
         self.collision_stuck_start_idx = 0
@@ -130,8 +127,6 @@ class Arduino:
         self.mode_pub.publish(std_msgs.msg.Int32(info['mode']))
         self.steer_pub.publish(std_msgs.msg.Float32(info['steer']))
         self.motor_pub.publish(std_msgs.msg.Float32(info['motor']))
-        self.battery_a_pub.publish(std_msgs.msg.Float32(info['batt_a']))
-        self.battery_b_pub.publish(std_msgs.msg.Float32(info['batt_b']))
         self.enc_left_pub.publish(std_msgs.msg.Float32(np.sign(info['motor']) * info['enc_left']))
         self.enc_right_pub.publish(std_msgs.msg.Float32(np.sign(info['motor']) * info['enc_right']))
         self.ori_pub.publish(geometry_msgs.msg.Quaternion(*info['orientation']))
@@ -145,9 +140,8 @@ ht'])
         self.enc_pub.publish(std_msgs.msg.Float32(enc))
         self.rpy_pub.publish(geometry_msgs.msg.Vector3(*tft.euler_from_quaternion(list(info['orientation'][1:]) + \
                                                                                     [info['orientation'][0]])))
-        self.battery_low_pub.publish(std_msgs.msg.Int32(int((info['batt_a'] < 3.4 * 3) or (info['batt_b'] < 3.4 * 3))))
-
-        coll_flip = (info['acc'][2] > 5.0)
+        
+        coll_flip = (info['acc'][2] > -5.0)
         coll_jolt = (info['acc'][0] < -10.0) or (info['acc'][0] > 10.0)
         curr_coll_stuck = ((enc == 0) and abs(info['motor']) > 0.15)
         self.collision_stuck_deque.append(curr_coll_stuck)
