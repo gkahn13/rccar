@@ -38,17 +38,17 @@ class Arduino:
         self.bumper_pub = rospy.Publisher('bumper', std_msgs.msg.Int32, queue_size=10)
         ### secondary publishers
         self.enc_pub = rospy.Publisher('encoder/both', std_msgs.msg.Float32, queue_size=10)
+        self.enc_error = rospy.Publisher('encoder/error', std_msgs.msg.Int32, queue_size=10)
+        self.enc_left_right_diff_zero = 0
+        
         self.rpy_pub = rospy.Publisher('orientation/rpy', geometry_msgs.msg.Vector3, queue_size=10)
         self.collision_pub = rospy.Publisher('collision/all', std_msgs.msg.Int32, queue_size=10)
         self.collision_flip_pub = rospy.Publisher('collision/flip', std_msgs.msg.Int32, queue_size=10)
         self.collision_jolt_pub = rospy.Publisher('collision/jolt', std_msgs.msg.Int32, queue_size=10)
         self.collision_stuck_pub = rospy.Publisher('collision/stuck', std_msgs.msg.Int32, queue_size=10)
-        self.collision_stuck_encoder_deque = collections.deque([], 40) # TODO: make larger to be more conservative
-        self.collision_stuck_motor_deque = collections.deque([], 40)
-        self.collision_stuck_deque = collections.deque([], 80)
+
+        self.collision_stuck_deque = collections.deque([], 100)
         self.collision_stuck_pct = 0.9
-        self.collision_stuck_end_idx = 5
-        self.collision_stuck_start_idx = 0
         self.collision_bumper_zero = 1024
         self.collision_bumper_pub = rospy.Publisher('collision/bumper', std_msgs.msg.Int32, queue_size=10)
         ### subscribers (info sent to Arduino)
@@ -135,13 +135,19 @@ class Arduino:
         self.bumper_pub.publish(std_msgs.msg.Int32(info['bumper']))
         
         ### transformations of raw topics
-        enc = 0.5 * np.sign(info['motor']) * (info['enc_left'] + info['enc_rig\
-ht'])
+        enc = 0.5 * np.sign(info['motor']) * (info['enc_left'] + info['enc_right'])
         self.enc_pub.publish(std_msgs.msg.Float32(enc))
+        if (abs(info['enc_left']) < 1e-3 and abs(info['enc_right']) > 1e-3) or \
+           (abs(info['enc_right']) < 1e-3 and abs(info['enc_left']) > 1e-3):
+            self.enc_left_right_diff_zero += 1
+        else:
+            self.enc_left_right_diff_zero = 0
+        self.enc_error.publish(std_msgs.msg.Int32(int(self.enc_left_right_diff_zero > 20)))
+        
         self.rpy_pub.publish(geometry_msgs.msg.Vector3(*tft.euler_from_quaternion(list(info['orientation'][1:]) + \
                                                                                     [info['orientation'][0]])))
         
-        coll_flip = (info['acc'][2] > -5.0)
+        coll_flip = (info['acc'][2] > 8.0)
         coll_jolt = (info['acc'][0] < -10.0) or (info['acc'][0] > 10.0)
         curr_coll_stuck = ((enc == 0) and abs(info['motor']) > 0.15)
         self.collision_stuck_deque.append(curr_coll_stuck)
