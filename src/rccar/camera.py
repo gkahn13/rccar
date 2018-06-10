@@ -16,8 +16,8 @@ class Camera:
             cam = cv2.VideoCapture(cam_num)
             if cam.read()[0]:
                 self._cam = cam
-                self._cam.set(3, 160)
-                self._cam.set(4, 90)
+                self._cam.set(3, 800)
+                self._cam.set(4, 450)
                 self._cam.set(11, 50)
                 self._cam.set(13, 50)
                 break
