@@ -16,10 +16,12 @@ class Camera:
             cam = cv2.VideoCapture(cam_num)
             if cam.read()[0]:
                 self._cam = cam
-                self._cam.set(3, 800)
-                self._cam.set(4, 450)
-                self._cam.set(11, 50)
-                self._cam.set(13, 50)
+                self._cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                self._cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                self._cam.set(cv2.CAP_PROP_BRIGHTNESS, 0.5)
+                self._cam.set(cv2.CAP_PROP_CONTRAST, 0.2)
+                self._cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+                self._cam.set(cv2.CAP_PROP_EXPOSURE, 0.08)
                 break
 
         assert(self._cam is not None)
