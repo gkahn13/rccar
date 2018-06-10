@@ -2,6 +2,7 @@
     <arg name="car_name" default="rccar" />
     <arg name="use_camera" default="true" />
     <arg name="use_pid" default="false" />
+    <arg name="babymonitor" default="false" />
     
     <group ns="$(arg car_name)">
         <node name="run_arduino" pkg="rccar" type="arduino_node.py" output="log" respawn="true">
@@ -16,6 +17,8 @@
                 kd: 0.00
               </rosparam>
         </node>
+
+	<node name="babymonitor" type="throttle" pkg="topic_tools" args="messages camera/image_raw/compressed 2 camera/image_raw_throttle/compressed" />
     </group>
 
 </launch>
